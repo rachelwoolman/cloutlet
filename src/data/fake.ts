@@ -315,8 +315,10 @@ export const creators: Creator[] = [
 ];
 
 // ---------- Offers in the creator's inbox ----------
-// The prototype pretends you are Renee when you pick "I'm a creator".
+// The prototype pretends you are Renee when you pick "I'm a creator",
+// and Crumb & Co. when you pick "I'm a business".
 export const currentCreatorId = 'renee';
+export const currentBusinessId = 'crumb';
 
 export const offers: Offer[] = [
   {
