@@ -4,17 +4,10 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar, Button, Card, Chip, MasonryFeed, VideoThumbnail } from '../components';
+import { businesses, creators, feed } from '../data/fake';
 import { colors, spacing, type } from '../theme';
 
-const coffee = 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600';
-const cafe = 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=600';
-
-const sampleFeed = [
-  { id: '1', height: 220, duration: '0:28', uri: cafe },
-  { id: '2', height: 160, duration: '0:19', uri: coffee },
-  { id: '3', height: 180, duration: '0:15', uri: coffee },
-  { id: '4', height: 240, duration: '0:31', uri: cafe },
-];
+const coffee = creators[0].avatar;
 
 export default function Index() {
   const [perk, setPerk] = useState(true);
@@ -48,11 +41,11 @@ export default function Index() {
 
       <Text style={type.label}>Card</Text>
       <Card>
-        <Text style={type.h3}>Crumb & Co.</Text>
-        <Text style={type.small}>Bakery · U-District · 0.4 mi</Text>
+        <Text style={type.h3}>{businesses[0].name}</Text>
+        <Text style={type.small}>{businesses[0].kind} · {businesses[0].neighborhood} · {businesses[0].distance}</Text>
       </Card>
 
-      <Text style={type.label}>Video thumbnail + masonry feed</Text>
+      <Text style={type.label}>Fake feed from src/data/fake.ts</Text>
       <View style={{ height: 1, backgroundColor: colors.divider }} />
     </View>
   );
@@ -60,12 +53,16 @@ export default function Index() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <MasonryFeed
-        items={sampleFeed}
+        items={feed}
         header={header}
         getHeight={(item) => item.height}
         keyExtractor={(item) => item.id}
         renderItem={(item) => (
-          <VideoThumbnail uri={item.uri} duration={item.duration} height={item.height} tag="Crumb & Co." />
+          <View style={{ gap: spacing.xs }}>
+            <VideoThumbnail uri={item.image} duration={item.duration} height={item.height} />
+            <Text style={type.bodyStrong} numberOfLines={2}>{item.title}</Text>
+            <Text style={type.small}>{item.creator.name}</Text>
+          </View>
         )}
       />
     </SafeAreaView>
