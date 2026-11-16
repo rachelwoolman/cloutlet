@@ -11,6 +11,13 @@ export const colors = {
   buttonFillPressed: '#DEDAD1',
   placeholder: '#E4E0D8', // shown while a photo loads or if it fails
   overlay: 'rgba(31, 30, 28, 0.6)', // small pills on top of photos
+  desk: '#EFECE5', // web only: the area around the phone frame
+} as const;
+
+// Web only: on a wide browser window the app is shown in a phone-sized frame
+export const webFrame = {
+  width: 400,
+  maxHeight: 860,
 } as const;
 
 // Font names match what we load in src/app/_layout.tsx
