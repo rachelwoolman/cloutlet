@@ -13,6 +13,25 @@ export const colors = {
   overlay: 'rgba(31, 30, 28, 0.6)', // small pills on top of photos
   desk: '#EFECE5', // web only: the area around the phone frame
   logoCard: '#F6F6F6', // matches the background baked into assets/logo.jpg
+
+  // Accent: orange. Used for primary buttons, active tabs, badges and map pins.
+  accent: '#EA5A0C',
+  accentPressed: '#CF4E09',
+  accentSoft: '#FDEADF', // light orange fill (selected chips, highlights)
+  onAccent: '#FFFFFF', // text on top of the accent
+
+  // "Open to work" badge (green, like LinkedIn's)
+  open: '#12805C',
+
+  // Google rating star (blue, so it reads as Google's, not ours)
+  google: '#1A73E8',
+  openSoft: '#E6F4EE',
+
+  // Full-screen reels sit on black
+  reelBackground: '#000000',
+  reelText: '#FFFFFF',
+  reelTextSecondary: 'rgba(255, 255, 255, 0.75)',
+  reelScrim: 'rgba(0, 0, 0, 0.45)',
 } as const;
 
 // Web only: on a wide browser window the app is shown in a phone-sized frame

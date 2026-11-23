@@ -1,0 +1,7 @@
+project_id = "cloutlet"
+
+# Edge Function settings. Instagram/TikTok/Google redirect the browser to
+# oauth-callback with no Supabase login attached, so it must be public.
+# (It only trusts the one-time `state` code it created in oauth-start.)
+[functions.oauth-callback]
+verify_jwt = false

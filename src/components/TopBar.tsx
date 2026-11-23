@@ -11,9 +11,10 @@ type Props = {
   icon?: 'back' | 'close';
   onBack?: () => void;
   right?: ReactNode;
+  hideBack?: boolean; // tab screens have nowhere to go back to
 };
 
-export function TopBar({ title, icon = 'back', onBack, right }: Props) {
+export function TopBar({ title, icon = 'back', onBack, right, hideBack = false }: Props) {
   const goBack = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/')));
 
   return (
@@ -26,9 +27,13 @@ export function TopBar({ title, icon = 'back', onBack, right }: Props) {
         paddingHorizontal: spacing.screen - 8,
       }}
     >
-      <Pressable onPress={goBack} hitSlop={12} style={{ padding: 8 }} accessibilityLabel="Go back">
-        <Feather name={icon === 'back' ? 'chevron-left' : 'x'} size={22} color={colors.text} />
-      </Pressable>
+      {hideBack ? (
+        <View style={{ width: 38 }} />
+      ) : (
+        <Pressable onPress={goBack} hitSlop={12} style={{ padding: 8 }} accessibilityLabel="Go back">
+          <Feather name={icon === 'back' ? 'chevron-left' : 'x'} size={22} color={colors.text} />
+        </Pressable>
+      )}
       {title ? (
         <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.text }}>{title}</Text>
       ) : null}

@@ -1,11 +1,11 @@
-// Primary = soft warm fill. Secondary = thin outline. Ghost = text only.
+// Primary = orange accent. Soft = warm fill. Secondary = thin outline. Ghost = text only.
 import { Pressable, StyleProp, Text, ViewStyle } from 'react-native';
 import { colors, fonts, radius, spacing } from '../theme';
 
 type Props = {
   title: string;
   onPress?: () => void;
-  variant?: 'primary' | 'secondary' | 'ghost';
+  variant?: 'primary' | 'soft' | 'secondary' | 'ghost';
   size?: 'md' | 'sm';
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -34,6 +34,9 @@ export function Button({
           opacity: disabled ? 0.4 : 1,
         },
         variant === 'primary' && {
+          backgroundColor: pressed ? colors.accentPressed : colors.accent,
+        },
+        variant === 'soft' && {
           backgroundColor: pressed ? colors.buttonFillPressed : colors.buttonFill,
         },
         variant === 'secondary' && {
@@ -47,9 +50,9 @@ export function Button({
     >
       <Text
         style={{
-          fontFamily: fonts.bodyMedium,
+          fontFamily: variant === 'primary' ? fonts.bodySemiBold : fonts.bodyMedium,
           fontSize: size === 'md' ? 15 : 14,
-          color: colors.text,
+          color: variant === 'primary' ? colors.onAccent : colors.text,
           textDecorationLine: variant === 'ghost' ? 'underline' : 'none',
         }}
       >
