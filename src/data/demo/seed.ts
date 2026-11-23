@@ -43,6 +43,7 @@ export const profiles: Profile[] = [
     cover: photos.bread,
     location: { lat: 47.6588, lng: -122.3128 },
     collabs: 4,
+    pitch: 'We love your style and think it would fit our long tables and fresh pastries. Would you be up for a collab?',
     google: { placeId: 'demo-crumb', address: '4210 University Way NE', rating: 4.7, reviewCount: 212, ownerVerified: true },
   },
   {
@@ -139,6 +140,7 @@ export const profiles: Profile[] = [
     replyTime: 'Replies in ~1d',
     openToPerksOnly: false,
     availability: 'closed',
+    services: ['reel', 'maps'],
     tiktok: { username: 'marcuseats', followers: 6800, verifiedAt },
   },
   {

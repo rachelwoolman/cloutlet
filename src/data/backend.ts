@@ -15,6 +15,7 @@ import {
   PlaceResult,
   Profile,
   Role,
+  ServiceId,
   ThreadWithPeople,
 } from './types';
 
@@ -34,7 +35,7 @@ export type NewProfile = {
 };
 
 // Fields you can change on your own profile
-export type ProfilePatch = { availability?: Availability; pitch?: string };
+export type ProfilePatch = { availability?: Availability; pitch?: string; services?: ServiceId[] };
 
 export interface Backend {
   mode: 'demo' | 'live';

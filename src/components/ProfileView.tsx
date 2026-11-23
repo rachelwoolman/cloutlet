@@ -7,7 +7,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { Animated, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { formatFollowers, priceFor, services } from '../data/catalog';
+import { formatFollowers, offeredServices, priceFor } from '../data/catalog';
 import { backend, setLastFeed, useFollowingIds, usePostsFor, useProfile } from '../data/hooks';
 import { useMe } from '../data/session';
 import { Profile } from '../data/types';
@@ -86,7 +86,7 @@ export function ProfileView({ id, asTab = false }: { id: string; asTab?: boolean
           {p.role === 'creator' && p.followers != null ? (
             <View>
               <Text style={[type.label, { marginBottom: spacing.sm }]}>Rates</Text>
-              {services.map((s) => {
+              {offeredServices(p).map((s) => {
                 const price = priceFor(s.id, p.followers!);
                 return (
                   <View key={s.id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.xs }}>

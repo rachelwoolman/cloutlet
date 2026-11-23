@@ -16,4 +16,4 @@ export { Divider, TopBar } from './TopBar';
 export { CheckBadge, Verified } from './Verified';
 export { VideoPreview } from './VideoPreview';
 export { VideoThumbnail } from './VideoThumbnail';
-export { isOpenToWork, MyCreatorSettings, OpenToWorkToggle, ProfileAvatar, Toggle, ToggleRow } from './CreatorStatus';
+export { isOpenToWork, MyBusinessSettings, MyCreatorSettings, OpenToWorkToggle, ProfileAvatar, Toggle, ToggleRow } from './CreatorStatus';

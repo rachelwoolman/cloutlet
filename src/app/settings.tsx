@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Card, CheckBadge, Divider, MyCreatorSettings, ToggleRow, TopBar } from '../components';
+import { Button, Card, CheckBadge, Divider, MyBusinessSettings, MyCreatorSettings, ToggleRow, TopBar } from '../components';
 import { isVerified } from '../data/catalog';
 import { useLocationStatus } from '../data/location';
 import { signOut, useMe } from '../data/session';
@@ -60,7 +60,7 @@ export default function Settings() {
           <Row icon="notifications" title="Notifications" note="Businesses you get job updates from" onPress={() => router.push('/notifications')} />
         ) : null}
 
-        {me.role === 'creator' ? <MyCreatorSettings me={me} /> : null}
+        {me.role === 'creator' ? <MyCreatorSettings me={me} /> : <MyBusinessSettings me={me} />}
 
         {me.role === 'creator' ? (
           <View style={{ gap: spacing.sm }}>

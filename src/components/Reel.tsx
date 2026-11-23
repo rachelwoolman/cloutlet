@@ -107,7 +107,7 @@ export function Reel({ post, me, active, width, height, topInset, bottomInset, c
         {isJob && post.job ? (
           <View style={{ gap: 6 }}>
             <View style={styles.hiring}>
-              <Text style={{ fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.onAccent }}>Hiring</Text>
+              <Text style={{ fontFamily: fonts.bodySemiBold, fontSize: 12, color: '#FFFFFF' }}>Hiring</Text>
             </View>
             <Text style={{ fontFamily: fonts.heading, fontSize: 28, lineHeight: 33, color: colors.reelText }}>{post.caption}</Text>
             <Text style={styles.jobLine}>
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   meta: { fontFamily: fonts.body, fontSize: 13, color: colors.reelTextSecondary },
   caption: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: colors.reelText },
   collabText: { fontFamily: fonts.body, fontSize: 13, color: colors.reelTextSecondary },
-  hiring: { alignSelf: 'flex-start', backgroundColor: colors.accent, paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.pill },
+  hiring: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(234, 90, 12, 0.72)', paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.pill }, // see-through orange
   jobLine: { fontFamily: fonts.body, fontSize: 15, color: colors.reelText },
   cta: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   dots: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },

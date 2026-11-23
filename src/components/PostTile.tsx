@@ -75,8 +75,8 @@ function JobCover({ post, height }: { post: FeedPost; height: number }) {
     <View style={{ height, borderRadius: radius.md, overflow: 'hidden', backgroundColor: colors.text }}>
       <Photo uri={post.image} style={{ position: 'absolute', width: '100%', height: '100%' }} />
       <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.reelScrim }]} />
-      <View style={[pill, { top: spacing.sm, backgroundColor: colors.accent }]}>
-        <Text style={{ fontFamily: fonts.bodySemiBold, fontSize: 11, color: colors.onAccent }}>Hiring</Text>
+      <View style={[pill, styles.hiring, { top: spacing.sm }]}>
+        <Text style={{ fontFamily: fonts.bodySemiBold, fontSize: 11, color: '#FFFFFF' }}>Hiring</Text>
       </View>
       <View style={{ position: 'absolute', left: spacing.md, right: spacing.md, bottom: spacing.md, gap: 2 }}>
         <Text style={{ fontFamily: fonts.bodySemiBold, fontSize: 15, color: colors.reelText }} numberOfLines={2}>
@@ -102,6 +102,8 @@ function JobCover({ post, height }: { post: FeedPost; height: number }) {
 const styles = StyleSheet.create({
   // Dark see-through pill with white text: readable on any photo
   partner: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(17, 17, 17, 0.55)' },
+  // See-through orange so job posts stand out
+  hiring: { backgroundColor: 'rgba(234, 90, 12, 0.72)' },
 });
 
 const pill: ViewStyle = {

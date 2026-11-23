@@ -48,7 +48,7 @@ screens = [
       ('4.4', 'Filter: Nearby', 'Within 2 miles of you.', A, 'cut', 'The ranking already puts nearby posts first.'),
       ('4.4b', 'Filter: bell', 'Bell-only chip after Nearby. Shows posts from businesses you turned the bell on for.', C, 'new', ''),
       ('4.5', 'Video tiles', 'Cover image, length, collab partner in a dark see-through pill with a location pin, caption, creator name, and the verified mark (orange check in a small light circle).', A, 'new', ''),
-      ('4.6', 'Job tiles', '"Hiring" pill, title, format, budget and perks, business name, over the business photo.', A, '', ''),
+      ('4.6', 'Job tiles', 'See-through orange "Hiring" pill, title, format, budget and perks, business name, over the business photo.', A, 'new', ''),
       ('4.7', 'Ranking differs by side', 'Creators see more jobs (at least every 4th post). Businesses see more creator videos. Never the same person twice in a row.', A, '', ''),
       ('4.8', 'Creators who are Open to work rank higher', 'Creators with it off still show, just lower.', A, 'new', ''),
       ('4.9', 'Pull down to refresh', 'Orange spinner while you pull, on iPhone, Android and web (on web: drag down, or scroll up past the top). Posts you\'ve already opened move down.', A, 'new', ''),
@@ -82,7 +82,7 @@ screens = [
       ('6.4', 'Picture, name, verified mark, niche or type, neighborhood, bio', '', A, '', ''),
       ('6.5', 'Open to work ring', 'Green ring and a small "OPEN TO WORK" banner on the profile picture, like LinkedIn. Nothing when it\'s off.', A, 'new', ''),
       ('6.6', 'One stats row', 'Creators: Instagram logo + followers, TikTok logo + followers (connected accounts only), collabs on Cloutlet. Businesses: blue star + Google rating with "212 Google reviews" (tap to open their Google reviews), orange star + Cloutlet rating with "11 Cloutlet reviews" (tap to read them), collabs.', A, 'new', ''),
-      ('6.7', 'Rates table', 'Suggested price per format from their follower tier. "Open to perks-only deals" when set.', 'Creator profiles', '', ''),
+      ('6.7', 'Rates table', 'Only the formats the creator offers, priced from their follower tier. "Open to perks-only deals" when set.', 'Creator profiles', 'new', ''),
       ('6.8', '"Request collab" and "Message"', 'Business viewing a creator gets both. Creator viewing a business gets Message. Hidden on your own and same-side profiles.', A, '', ''),
       ('6.9', 'Posts grid', 'Their posts plus collabs they\'re tagged in. Tap to open the viewer.', A, '', ''),
     ]),
@@ -90,12 +90,12 @@ screens = [
     shots=[('05-request-collab', 'New offer')],
     feats=[
       ('7.1', 'Who it\'s for, and how fast they reply', '', B, '', ''),
-      ('7.2', 'Format list with a price for each', 'Instagram Reel, Google Maps video, Story set (3). Picking one fills in its suggested price.', B, '', ''),
+      ('7.2', 'Format list with a price for each', 'Only formats this creator offers. Picking one fills in its suggested price.', B, 'new', ''),
       ('7.3', '"Suggested $50 for 2K – 10K followers"', '', B, '', ''),
       ('7.4', 'Price: − / + buttons, or type it', '', B, '', ''),
       ('7.5', 'Perks', '2 pastries, A drink, Lunch for two, Free brunch, A tote bag.', B, '', ''),
       ('7.6', '"Post by" date', 'Free text. Empty means "Flexible".', B, '', ''),
-      ('7.7', 'Short note', 'Empty means "Hi Priya! Want to collab?"', B, '', ''),
+      ('7.7', 'Message', 'Starts as "Hi Priya!" plus your default message from Settings. Editable. Shows in the chat as a normal message.', B, 'new', ''),
       ('7.8', 'Total and "Send offer"', 'Opens the chat with the offer pinned.', B, '', ''),
     ]),
   dict(id='chat', n=8, tab=None, title='Chat', blurb='One chat per creator and business pair, with the current offer pinned at the top. Terms are talked through in messages, like a normal professional negotiation; there are no bargaining controls.',
@@ -106,7 +106,7 @@ screens = [
       ('8.3', 'Decline / Accept', 'Creator, when an offer is waiting on them.', C, 'new', ''),
       ('8.4', '"Update offer"', 'Business, while waiting. After agreeing on new terms in the chat, send them as an updated offer. "Send a new offer" after a decline.', B, 'new', ''),
       ('8.5', '"Send an offer" button', 'When there\'s no offer yet.', B, '', ''),
-      ('8.6', 'Message history', 'Offers, accepts and declines show as small cards.', A, '', ''),
+      ('8.6', 'Message history', 'Offers, accepts and declines show as a small grey line with the terms. Any note sent with an offer is a normal message bubble.', A, 'new', ''),
       ('8.7', 'Message box and send', 'Grows with your text. Comes pre-filled when you tap Message on a job.', A, 'new', ''),
       ('8.8', 'After accepting', 'The card says "Deal done. Share details here." Nothing else happens yet.', A, '', ''),
     ]),
@@ -144,6 +144,8 @@ screens = [
     feats=[
       ('12.1', 'Saved (at the top)', 'Creators: Jobs and Videos tabs. Businesses: Videos.', A, 'new', ''),
       ('12.1b', 'Notifications', 'Right under Saved. Lists the businesses you turned the bell on for, each with a switch. Turned-off ones stay in the list until you leave, so you can undo.', C, 'new', ''),
+      ('12.2b', 'Services you offer', 'A switch per format with your rate. Turned-off formats disappear from your profile and from offers. At least one stays on.', C, 'new', ''),
+      ('12.2c', 'Default message (businesses)', 'Written by the business; pre-fills Request collab. No suggestions, just a tip.', B, 'new', ''),
       ('12.2', 'Open to work switch', 'On or off. When on, businesses see you first and your profile picture gets the green ring.', C, 'new', ''),
       ('12.3', 'Your pitch', 'Written by the creator, used in the message when they tap Message on a job. No suggestions; just a tip on what to include (niche, location, audience).', C, 'new', ''),
       ('12.4', 'Portfolio: Add a video', '', C, 'new', ''),
@@ -333,7 +335,7 @@ dialog button {{ font: 600 14px var(--sans); color: var(--ink); background: #fff
 <main>
   <div class="container">
     <header class="hero">
-      <p class="eyebrow">Product review · Round 7 · Nov 22, 2026</p>
+      <p class="eyebrow">Product review · Round 8 · Nov 22, 2026</p>
       <h1>Cloutlet screen review</h1>
       <p class="lede">Every screen in the app and every feature on it, numbered so the team can say "keep 6.4" or "cut 4.3". Screenshots come from the app running on sample data. Tap a phone to enlarge it; tall screens scroll inside the frame.</p>
       <div class="stats">

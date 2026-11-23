@@ -19,7 +19,7 @@ export default function Chat() {
   const thread = useThread(id);
   const messages = useMessages(id);
   const [draft, setDraft] = useState(startDraft ?? ''); // pre-filled when a creator messages about a job
-  const [inputHeight, setInputHeight] = useState(40); // grows with the text, up to 160
+  const [inputWidth, setInputWidth] = useState(280);
   const [error, setError] = useState<string | null>(null);
   const scroll = useRef<ScrollViewInstance>(null);
 
@@ -87,14 +87,14 @@ export default function Chat() {
           <TextInput
             value={draft}
             onChangeText={setDraft}
+            onLayout={(e) => setInputWidth(e.nativeEvent.layout.width)}
             placeholder="Message"
             placeholderTextColor={colors.textSecondary}
             multiline
             onSubmitEditing={send}
-            onContentSizeChange={(e) => setInputHeight(Math.min(160, Math.max(40, Math.ceil(e.nativeEvent.contentSize.height) + 4)))}
             style={{
               flex: 1,
-              height: inputHeight,
+              height: inputHeightFor(draft, inputWidth),
               paddingHorizontal: spacing.lg,
               paddingVertical: 10,
               borderRadius: 20,
@@ -157,23 +157,36 @@ function OfferPanel({ offer, other, me, onError }: { offer: Offer; other: Profil
 }
 
 function Bubble({ message, mine }: { message: Message; mine: boolean }) {
-  // Offer events show as centered cards
+  // Offer events show as a small neutral line with the terms. Any note the sender
+  // added shows right after it as a regular message, like the rest of the chat.
   if (message.kind !== 'text') {
-    const label = { offer: 'Offer', counter: 'Counter', accepted: 'Accepted', declined: 'Declined' }[message.kind];
-    const terms = message.price != null ? formatTerms(message.price, message.perks ?? []) : null;
+    const label = { offer: 'Offer', counter: 'Updated offer', accepted: 'Accepted', declined: 'Declined' }[message.kind];
+    const terms = message.price != null && message.kind !== 'declined' ? formatTerms(message.price, message.perks ?? []) : null;
+    const note = message.body && !['Deal', 'Declined', 'New terms'].includes(message.body) ? message.body : null;
     return (
-      <View style={{ alignSelf: 'center', alignItems: 'center', maxWidth: '85%', gap: 2, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: message.kind === 'declined' ? colors.buttonFill : colors.accentSoft }}>
-        <Text style={{ fontFamily: fonts.bodySemiBold, fontSize: 12, color: message.kind === 'declined' ? colors.textSecondary : colors.accentPressed }}>
-          {label}
-          {terms && message.kind !== 'declined' ? ` · ${terms}` : ''}
-        </Text>
-        {message.body && !['Deal', 'Declined', 'New terms'].includes(message.body) ? (
-          <Text style={[type.small, { color: colors.text, textAlign: 'center' }]}>{message.body}</Text>
-        ) : null}
-      </View>
+      <>
+        <View style={{ alignSelf: 'center', maxWidth: '85%', paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.buttonFill }}>
+          <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>
+            {label}
+            {terms ? ` · ${terms}` : ''}
+          </Text>
+        </View>
+        {note ? <TextBubble body={note} mine={mine} /> : null}
+      </>
     );
   }
+  return <TextBubble body={message.body} mine={mine} />;
+}
 
+// The message box grows with what you type (up to about 6 lines) and shrinks back as you delete.
+// Worked out from the text itself so it behaves the same on phones and web.
+function inputHeightFor(text: string, width: number): number {
+  const perLine = Math.max(10, Math.floor((width - 2 * spacing.lg) / 8.2)); // ~8px per character at 15px
+  const lines = text.split('\n').reduce((n, line) => n + Math.max(1, Math.ceil(line.length / perLine)), 0);
+  return Math.min(160, Math.max(40, lines * 21 + 20));
+}
+
+function TextBubble({ body, mine }: { body: string; mine: boolean }) {
   return (
     <View
       style={{
@@ -189,7 +202,7 @@ function Bubble({ message, mine }: { message: Message; mine: boolean }) {
         borderColor: colors.divider,
       }}
     >
-      <Text style={{ fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: mine ? colors.onAccent : colors.text }}>{message.body}</Text>
+      <Text style={{ fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: mine ? colors.onAccent : colors.text }}>{body}</Text>
     </View>
   );
 }

@@ -39,6 +39,7 @@ function toProfile(r: any): Profile {
     openToPerksOnly: r.open_to_perks_only ?? undefined,
     availability: r.availability ?? undefined,
     pitch: r.pitch || undefined,
+    services: Array.isArray(r.services) && r.services.length ? r.services : undefined,
     kind: r.kind ?? undefined,
     cover: r.cover_url ?? undefined,
     collabs: r.collabs,

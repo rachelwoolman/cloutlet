@@ -90,3 +90,11 @@ Review page: `docs/screen-review/index.html` (rebuild with `docs/screen-review/b
 
 - [x] Explore: bell chip after Nearby (creators) shows posts from businesses you turned the bell on for
 - [x] Settings › Notifications (under Saved): businesses you get job updates from, with a switch for each
+
+## Round 8 (Nov 22, 2026)
+
+- [x] Hiring pill: see-through orange, no icon (feed and full-screen job post)
+- [x] Businesses: default collab message in Settings; pre-fills Request collab ("Hi Priya! …")
+- [x] Creators: Services you offer (switch per format, at least one on); profile rates and offers only show those
+- [x] Chat: offer note shows as a normal message bubble; offer events are a small grey line with the terms
+- [x] Chat message box grows with the text and shrinks back

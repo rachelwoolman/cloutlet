@@ -26,6 +26,9 @@ export const perkOptions = ['2 pastries', 'A drink', 'Lunch for two', 'Free brun
 
 export const getService = (id: ServiceId) => services.find((s) => s.id === id)!;
 
+// The formats a creator offers (they can turn some off in Settings)
+export const offeredServices = (p: { services?: ServiceId[] }) => services.filter((s) => !p.services || p.services.includes(s.id));
+
 export function tierIndexFor(followers: number): number {
   return audienceTiers.findIndex(
     (t) => followers >= t.minFollowers && (t.maxFollowers === null || followers <= t.maxFollowers),

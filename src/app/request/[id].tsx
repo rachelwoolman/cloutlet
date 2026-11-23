@@ -1,10 +1,11 @@
-// Business > send a creator an offer. Opens the chat so you can keep negotiating.
+// Business > send a creator an offer. Only the formats they offer are listed, and the message
+// starts from the business's default message (Settings). Opens the chat to keep talking.
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar, Button, Divider, Empty, ErrorNote, Loading, TermsEditor, TopBar } from '../../components';
-import { audienceTiers, firstName, formatTerms, priceFor, services, tierIndexFor } from '../../data/catalog';
+import { audienceTiers, firstName, formatTerms, offeredServices, priceFor, tierIndexFor } from '../../data/catalog';
 import { backend, useProfile } from '../../data/hooks';
 import { useMe } from '../../data/session';
 import { ServiceId } from '../../data/types';
@@ -16,11 +17,14 @@ export default function RequestCollab() {
   const creator = useProfile(id);
   const c = creator.data;
 
-  const [serviceId, setServiceId] = useState<ServiceId>('reel');
+  const offered = c ? offeredServices(c) : [];
+  const [picked, setServiceId] = useState<ServiceId>();
+  const serviceId: ServiceId = picked && offered.some((s) => s.id === picked) ? picked : (offered[0]?.id ?? 'reel');
   const [customPrice, setCustomPrice] = useState<number | null>(null); // null = use the suggested rate
   const [perks, setPerks] = useState<string[]>([]);
   const [postBy, setPostBy] = useState('');
-  const [message, setMessage] = useState('');
+  const [edited, setMessage] = useState<string>(); // undefined until they type
+  const message = edited ?? (c && me.pitch ? `Hi ${firstName(c.name)}! ${me.pitch}` : '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,7 +79,7 @@ export default function RequestCollab() {
           <View style={{ gap: spacing.sm }}>
             <Text style={type.label}>Format</Text>
             <View style={{ borderWidth: 1, borderColor: colors.divider, borderRadius: radius.md, backgroundColor: colors.surface }}>
-              {services.map((s, i) => {
+              {offered.map((s, i) => {
                 const selected = s.id === serviceId;
                 const p = priceFor(s.id, followers);
                 return (
@@ -104,7 +108,7 @@ export default function RequestCollab() {
           </View>
 
           <Field value={postBy} onChangeText={setPostBy} placeholder="Post by (e.g. Dec 12)" />
-          <Field value={message} onChangeText={setMessage} placeholder="Short note" multiline />
+          <Field value={message} onChangeText={setMessage} placeholder="Message" multiline />
           {error ? <ErrorNote message={error} /> : null}
         </ScrollView>
 

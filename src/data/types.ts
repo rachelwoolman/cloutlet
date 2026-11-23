@@ -50,7 +50,8 @@ export type Profile = {
   replyTime?: string;
   openToPerksOnly?: boolean;
   availability?: Availability;
-  pitch?: string; // their intro, pre-filled when they message about a job
+  pitch?: string; // creators: their intro on job messages · businesses: their default collab-request message
+  services?: ServiceId[]; // creators: what they offer (all formats if not set)
 
   // Businesses
   kind?: string; // "Bakery"

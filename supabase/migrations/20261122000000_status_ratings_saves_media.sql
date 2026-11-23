@@ -7,12 +7,14 @@
 -- availability: like LinkedIn's "Open to work". open = wants paid work now (ranked higher).
 alter table public.profiles
   add column availability text not null default 'open' check (availability in ('open', 'networking', 'closed')),
-  add column pitch text not null default '',
+  add column pitch text not null default '',  -- creators: job-message pitch · businesses: default collab message
+  add column services text[] not null default '{reel,maps,stories}'
+    check (cardinality(services) > 0 and services <@ array['reel', 'maps', 'stories']),
   add column rating_avg numeric(2, 1),          -- set by the reviews trigger below, never by the app
   add column rating_count integer not null default 0;
 
-grant insert (availability, pitch) on public.profiles to authenticated;
-grant update (availability, pitch) on public.profiles to authenticated;
+grant insert (availability, pitch, services) on public.profiles to authenticated;
+grant update (availability, pitch, services) on public.profiles to authenticated;
 
 -- ---------- Job post photos/videos (up to 10) ----------
 -- [{ "uri": "https://...", "type": "image" | "video" }, ...]
