@@ -66,11 +66,19 @@ export type Profile = {
 
 export type PostKind = 'video' | 'job';
 
+// What a hiring post asks for. Required: title (the post caption), description, format,
+// how many, and a budget (or "open to offers"). Everything else is optional.
+// Pay is a starting point: terms for each creator are worked out in chat.
 export type Job = {
-  serviceId: ServiceId;
-  budget: number | null; // null = "Open to offers"
-  perks: string[];
-  postBy?: string;
+  serviceId: ServiceId; // format
+  quantity: number; // how many of that format, e.g. 3 Reels (1-20)
+  description?: string; // what the creator would do; can be long
+  budget: number | null; // per creator; null = "Open to offers"
+  perks: string[]; // presets or the business's own
+  deadline?: string; // "2026-12-12" (local date)
+  timeframe?: string; // how long the work takes, e.g. "1–2 weeks"
+  hires?: number; // how many creators they want; unset = not decided
+  postBy?: string; // older posts only: free-text date ("Dec 3"). New posts use `deadline`
 };
 
 export type Post = {
@@ -89,6 +97,9 @@ export type Post = {
   collabCreatorId?: string;
   job?: Job;
   media?: Media[]; // job posts: the business's own photos/videos of their space
+  applicationCount?: number; // job posts: applications actually sent (see Application)
+  viewCount?: number; // job posts: people who saw it in the full-screen viewer (one per person per day), counted since tracking started
+  archived?: boolean; // job posts: closed by the business. Hidden from the feed; still listed under Archived
 };
 
 // A post with the people on it already looked up
@@ -98,29 +109,36 @@ export type FeedPost = Post & {
   collabCreator?: Profile;
 };
 
-// pending   = waiting on the other side
-// accepted  = deal agreed
+// How a deal is agreed, all inside the chat:
+// pending   = one side proposed terms; waiting on the other side to accept them
+// agreed    = the other side accepted the terms; waiting on the side that proposed them to confirm
+// accepted  = the proposer confirmed: deal done, the collab can start
 // declined  = one side said no
-export type OfferStatus = 'pending' | 'accepted' | 'declined';
+// Opening a chat or sending a message never changes the status.
+export type OfferStatus = 'pending' | 'agreed' | 'accepted' | 'declined';
 
 export type Offer = {
   id: string;
   businessId: string;
   creatorId: string;
   serviceId: ServiceId;
+  quantity: number; // e.g. 3 Reels
   price: number;
   perks: string[];
   postBy: string;
   status: OfferStatus;
-  lastProposedBy: Role; // whoever set the current terms; the other side responds
+  lastProposedBy: Role; // whoever set the current terms; the other side accepts them, then this side confirms
   threadId: string;
+  postId?: string; // the job post these terms started from, when the creator applied to one
   createdAt: number;
   updatedAt: number;
 };
 
 export type OfferWithPeople = Offer & { business: Profile; creator: Profile };
 
-export type MessageKind = 'text' | 'offer' | 'counter' | 'accepted' | 'declined';
+// application = a creator applied to a job post (postId says which)
+// agreed = the other side accepted the terms · accepted = the proposer confirmed the deal
+export type MessageKind = 'text' | 'application' | 'offer' | 'counter' | 'agreed' | 'accepted' | 'declined';
 
 export type Message = {
   id: string;
@@ -130,8 +148,26 @@ export type Message = {
   body: string;
   price?: number;
   perks?: string[];
+  // Offer messages carry the full terms, so every version stays readable in the chat
+  serviceId?: ServiceId;
+  quantity?: number;
+  postBy?: string;
+  postId?: string; // application messages, and offers made from a job post
   createdAt: number;
 };
+
+// A creator applied to a job post. Only exists once they actually sent the application message:
+// opening the Apply screen and closing it creates nothing.
+export type Application = {
+  id: string;
+  postId: string;
+  creatorId: string;
+  businessId: string;
+  threadId: string;
+  createdAt: number;
+};
+
+export type ApplicationWithPeople = Application & { creator: Profile; post: FeedPost };
 
 export type Thread = {
   id: string;
@@ -142,9 +178,15 @@ export type Thread = {
   updatedAt: number;
 };
 
-export type ThreadWithPeople = Thread & { business: Profile; creator: Profile; offer?: Offer };
+// applications: job posts this creator applied to in this chat (one chat per business + creator)
+export type ThreadWithPeople = Thread & {
+  business: Profile;
+  creator: Profile;
+  offer?: Offer;
+  applications: { postId: string; title: string; createdAt: number }[];
+};
 
-export type Service = { id: ServiceId; name: string; description: string };
+export type Service = { id: ServiceId; name: string; plural: string; description: string };
 
 export type AudienceTier = {
   label: string;
@@ -153,9 +195,19 @@ export type AudienceTier = {
   maxFollowers: number | null;
 };
 
+export type OfferTerms = {
+  serviceId: ServiceId;
+  quantity: number;
+  price: number;
+  perks: string[];
+  postBy: string;
+};
+
 export type NewOffer = {
   creatorId: string;
+  postId?: string; // proposing terms to someone who applied to this post
   serviceId: ServiceId;
+  quantity: number;
   price: number;
   perks: string[];
   postBy: string;
@@ -165,6 +217,9 @@ export type NewOffer = {
 export type NewPost =
   | { kind: 'video'; caption: string; localUri: string; mimeType?: string; collabBusinessId?: string }
   | { kind: 'job'; caption: string; job: Job; media?: NewMedia[] };
+
+// Editing a job post: keep some of the photos/videos already on it, add new ones
+export type JobUpdate = { caption: string; job: Job; keepMedia: Media[]; newMedia: NewMedia[] };
 
 // A rating left on Cloutlet after a deal (1-5 stars and a few words)
 export type Review = { id: string; reviewer: Profile; stars: number; body: string; createdAt: number; serviceId?: ServiceId };

@@ -2,7 +2,7 @@
 // Demo data. Used when the app isn't connected to Supabase yet
 // (no EXPO_PUBLIC_SUPABASE_URL in .env). Edit freely.
 // ─────────────────────────────────────────────────────────────
-import { Message, Offer, Post, Profile, Thread } from '../types';
+import { Application, Message, Offer, Post, Profile, Thread } from '../types';
 
 const img = (id: string, w = 800) => `https://images.unsplash.com/${id}?w=${w}&q=70&auto=format&fit=crop`;
 const portrait = (id: string) => img(id, 200);
@@ -24,6 +24,11 @@ const photos = {
 
 const now = Date.now();
 const hours = (h: number) => now - h * 3600 * 1000;
+// A local date n days from today, "2026-12-12", so sample deadlines never end up in the past
+const daysFromNow = (n: number) => {
+  const d = new Date(now + n * 86400 * 1000);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 const verifiedAt = '2026-10-01T00:00:00Z';
 
 // Who you are in demo mode
@@ -229,27 +234,65 @@ export const posts: Post[] = [
   { id: 'd2', kind: 'video', authorId: 'dana', caption: 'Croissant power rankings', image: photos.cafeInterior, duration: '0:52', createdAt: hours(100), likes: 480, views: 6100 },
 
   // Business job posts (shown over the business's own photo)
-  { id: 'job1', kind: 'job', authorId: 'ravenna-bean', caption: 'Film a quiet afternoon here', image: photos.cafeWindow, createdAt: hours(7), likes: 40, views: 600, job: { serviceId: 'maps', budget: 80, perks: ['A drink'], postBy: 'Dec 3' }, media: [photos.cafeWindow, photos.barCounter, photos.espresso, photos.coffeeBeans].map((uri) => ({ uri, type: 'image' as const })) },
-  { id: 'job2', kind: 'job', authorId: 'hilltop', caption: 'Late-night noodle Reel', image: photos.restaurant, createdAt: hours(26), likes: 22, views: 340, job: { serviceId: 'reel', budget: null, perks: ['Lunch for two'], postBy: 'Dec 10' }, media: [photos.restaurant, photos.noodles, photos.ramenBar].map((uri) => ({ uri, type: 'image' as const })) },
-  { id: 'job3', kind: 'job', authorId: 'matcha-moto', caption: 'Stories for our hojicha menu', image: photos.latteArt, createdAt: hours(50), likes: 31, views: 410, job: { serviceId: 'stories', budget: 25, perks: ['Free brunch'], postBy: 'Nov 30' } },
+  // job1-3 are older posts: free-text "post by" date instead of a real deadline
+  { id: 'job1', kind: 'job', authorId: 'ravenna-bean', caption: 'Film a quiet afternoon here', image: photos.cafeWindow, createdAt: hours(7), likes: 40, views: 600, job: { serviceId: 'maps', quantity: 1, description: 'Come by on a weekday afternoon and film the slow, sunny hours: the window seats, the bar, someone pulling a shot. One short video for our Google listing.', budget: 80, perks: ['A drink'], postBy: 'Dec 3', timeframe: 'Within a week', hires: 1 }, media: [photos.cafeWindow, photos.barCounter, photos.espresso, photos.coffeeBeans].map((uri) => ({ uri, type: 'image' as const })) },
+  { id: 'job2', kind: 'job', authorId: 'hilltop', caption: 'Late-night noodle Reel', image: photos.restaurant, createdAt: hours(26), likes: 22, views: 340, job: { serviceId: 'reel', quantity: 2, description: 'We are open until 2am and want people to know it. Two Reels showing the late crowd, the steam off the bowls and the open kitchen. Come any night after 10pm.', budget: null, perks: ['Lunch for two'], postBy: 'Dec 10', hires: 3 }, media: [photos.restaurant, photos.noodles, photos.ramenBar].map((uri) => ({ uri, type: 'image' as const })) },
+  { id: 'job3', kind: 'job', authorId: 'matcha-moto', caption: 'Stories for our hojicha menu', image: photos.latteArt, createdAt: hours(50), likes: 31, views: 410, job: { serviceId: 'stories', quantity: 1, description: 'One set of stories trying our new hojicha drinks. Tag us and we will reshare.', budget: 25, perks: ['Free brunch'], postBy: 'Nov 30' } },
+  // Crumb & Co. (the demo business) has two posts with different applicants
+  {
+    id: 'job4', kind: 'job', authorId: 'crumb', caption: 'Finals-week study Reels', image: photos.cafeTables, createdAt: hours(20), likes: 18, views: 250,
+    job: {
+      serviceId: 'reel', quantity: 3, budget: 50, perks: ['2 pastries', 'Free refills all week'], deadline: daysFromNow(14), timeframe: '1–2 weeks', hires: 2,
+      description:
+        'Finals are coming and our long tables fill up with students every night. We want three short Reels that show what studying here is like: the outlets at every seat, the quiet back room, free refills, and the late-night pastry case.\n\n' +
+        'What we are looking for:\n• One Reel of a full study session (time-lapse is great)\n• One Reel about the pastry case and drinks\n• One "study spots near UW" style Reel that includes us\n\n' +
+        'Film any weekday between 6pm and 11pm. We will save you a seat by the window and the drinks and pastries are on us while you film. Please tag @crumbandco and use the location tag. Happy to talk through ideas before you start.',
+    },
+    media: [photos.cafeTables, photos.bread, photos.cafeInterior].map((uri) => ({ uri, type: 'image' as const })),
+  },
+  {
+    id: 'job5', kind: 'job', authorId: 'crumb', caption: 'Holiday pastry box Stories', image: photos.bread, createdAt: hours(44), likes: 9, views: 120,
+    job: { serviceId: 'stories', quantity: 2, budget: null, perks: ['A holiday pastry box to take home'], deadline: daysFromNow(24), description: 'Two story sets unboxing our holiday pastry box. Pick it up any morning; the box is yours to keep.' },
+  },
+  // Filled and archived: only on Crumb & Co.'s jobs list under Archived
+  {
+    id: 'job6', kind: 'job', authorId: 'crumb', caption: 'Back-to-school Maps video', image: photos.cafeInterior, createdAt: hours(900), likes: 12, views: 200, archived: true,
+    job: { serviceId: 'maps', quantity: 1, budget: 40, perks: ['A drink'], postBy: 'Sep 15', description: 'One Google Maps video of the morning rush.' },
+  },
 ];
 
 export const offers: Offer[] = [
-  { id: 'o1', businessId: 'crumb', creatorId: 'renee', serviceId: 'reel', price: 50, perks: ['2 pastries', 'A drink'], postBy: 'Nov 28', status: 'pending', lastProposedBy: 'business', threadId: 't1', createdAt: hours(2), updatedAt: hours(2) },
-  { id: 'o2', businessId: 'ravenna-bean', creatorId: 'renee', serviceId: 'maps', price: 80, perks: ['A drink'], postBy: 'Dec 3', status: 'pending', lastProposedBy: 'business', threadId: 't2', createdAt: hours(26), updatedAt: hours(26) },
-  { id: 'o3', businessId: 'matcha-moto', creatorId: 'renee', serviceId: 'stories', price: 25, perks: ['Free brunch'], postBy: 'Nov 30', status: 'pending', lastProposedBy: 'business', threadId: 't3', createdAt: hours(72), updatedAt: hours(72) },
+  { id: 'o1', businessId: 'crumb', creatorId: 'renee', serviceId: 'reel', quantity: 1, price: 50, perks: ['2 pastries', 'A drink'], postBy: 'Nov 28', status: 'pending', lastProposedBy: 'business', threadId: 't1', createdAt: hours(2), updatedAt: hours(2) },
+  { id: 'o2', businessId: 'ravenna-bean', creatorId: 'renee', serviceId: 'maps', quantity: 1, price: 80, perks: ['A drink'], postBy: 'Dec 3', status: 'pending', lastProposedBy: 'business', threadId: 't2', createdAt: hours(26), updatedAt: hours(26) },
+  { id: 'o3', businessId: 'matcha-moto', creatorId: 'renee', serviceId: 'stories', quantity: 1, price: 25, perks: ['Free brunch'], postBy: 'Nov 30', status: 'pending', lastProposedBy: 'business', threadId: 't3', createdAt: hours(72), updatedAt: hours(72) },
 ];
 
 export const threads: Thread[] = [
   { id: 't1', businessId: 'crumb', creatorId: 'renee', offerId: 'o1', updatedAt: hours(2) },
   { id: 't2', businessId: 'ravenna-bean', creatorId: 'renee', offerId: 'o2', updatedAt: hours(26) },
   { id: 't3', businessId: 'matcha-moto', creatorId: 'renee', offerId: 'o3', updatedAt: hours(72) },
+  // Applicants to Crumb & Co.'s posts
+  { id: 't4', businessId: 'crumb', creatorId: 'marcus', updatedAt: hours(10) },
+  { id: 't5', businessId: 'crumb', creatorId: 'priya', updatedAt: hours(6) },
+  { id: 't6', businessId: 'crumb', creatorId: 'dana', updatedAt: hours(30) },
+  // A casual chat: Lee wrote without applying to anything
+  { id: 't7', businessId: 'crumb', creatorId: 'lee', updatedAt: hours(4) },
+];
+
+export const applications: Application[] = [
+  { id: 'ap1', postId: 'job4', creatorId: 'marcus', businessId: 'crumb', threadId: 't4', createdAt: hours(10) },
+  { id: 'ap2', postId: 'job4', creatorId: 'priya', businessId: 'crumb', threadId: 't5', createdAt: hours(6) },
+  { id: 'ap3', postId: 'job5', creatorId: 'dana', businessId: 'crumb', threadId: 't6', createdAt: hours(30) },
 ];
 
 export const messages: Message[] = [
   { id: 'msg1', threadId: 't1', senderId: 'crumb', kind: 'offer', body: 'Finals-week Reel at our long tables?', price: 50, perks: ['2 pastries', 'A drink'], createdAt: hours(2) },
   { id: 'msg2', threadId: 't2', senderId: 'ravenna-bean', kind: 'offer', body: "We're new and barely on Maps. A quiet-afternoon video would help a lot.", price: 80, perks: ['A drink'], createdAt: hours(26) },
   { id: 'msg3', threadId: 't3', senderId: 'matcha-moto', kind: 'offer', body: 'Three stories on our hojicha menu? Brunch is on us.', price: 25, perks: ['Free brunch'], createdAt: hours(72) },
+  { id: 'msg4', threadId: 't4', senderId: 'marcus', kind: 'application', postId: 'job4', body: 'Hi Crumb & Co.! I\'d like to apply for "Finals-week study Reels". I film study-with-me videos around UW and can do evenings next week.', createdAt: hours(10) },
+  { id: 'msg5', threadId: 't5', senderId: 'priya', kind: 'application', postId: 'job4', body: 'Hi! Latte art and cozy study spots are my whole page. Would love to do these three.', createdAt: hours(6) },
+  { id: 'msg6', threadId: 't6', senderId: 'dana', kind: 'application', postId: 'job5', body: 'Hi Crumb & Co.! Pastry content is my favorite. I can pick the box up this weekend.', createdAt: hours(30) },
+  { id: 'msg7', threadId: 't7', senderId: 'lee', kind: 'text', body: 'Hey! Big fan of your cardamom buns. Would you ever want a study video at your place?', createdAt: hours(4) },
 ];
 
 // Bells turned on: creators who get an update when these businesses post a job

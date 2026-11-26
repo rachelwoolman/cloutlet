@@ -1,7 +1,10 @@
 // Pick a price and perks. Used for job posts and offers.
+// Perks: tap a suggestion, or type your own ("Free refills all week").
 import { Feather } from '@expo/vector-icons';
+import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { perkOptions } from '../data/catalog';
+import { MAX_PERK_LENGTH } from '../data/jobs';
 import { colors, fonts, radius, spacing, type } from '../theme';
 import { Chip } from './Chip';
 
@@ -17,6 +20,15 @@ export function TermsEditor({ price, perks, onChange, step = 5, hidePrice }: Pro
   const setPrice = (p: number) => onChange(Math.max(0, Math.round(p)), perks);
   const togglePerk = (perk: string) =>
     onChange(price, perks.includes(perk) ? perks.filter((p) => p !== perk) : [...perks, perk]);
+  const [custom, setCustom] = useState('');
+  const addCustom = () => {
+    const perk = custom.trim().slice(0, MAX_PERK_LENGTH);
+    if (!perk) return;
+    if (!perks.some((p) => p.toLowerCase() === perk.toLowerCase())) onChange(price, [...perks, perk]);
+    setCustom('');
+  };
+  // Your own perks show as selected chips next to the suggestions; tap to remove
+  const chips = [...perkOptions, ...perks.filter((p) => !perkOptions.includes(p))];
 
   return (
     <View style={{ gap: spacing.lg }}>
@@ -38,9 +50,25 @@ export function TermsEditor({ price, perks, onChange, step = 5, hidePrice }: Pro
       <View style={{ gap: spacing.sm }}>
         <Text style={type.label}>Perks</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-          {perkOptions.map((perk) => (
+          {chips.map((perk) => (
             <Chip key={perk} label={perk} selected={perks.includes(perk)} onPress={() => togglePerk(perk)} />
           ))}
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <TextInput
+            value={custom}
+            onChangeText={setCustom}
+            onSubmitEditing={addCustom}
+            maxLength={MAX_PERK_LENGTH}
+            placeholder="Add your own perk"
+            placeholderTextColor={colors.textSecondary}
+            accessibilityLabel="Add your own perk"
+            returnKeyType="done"
+            style={{ flex: 1, height: 44, paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.divider, backgroundColor: colors.surface, fontFamily: fonts.body, fontSize: 15, color: colors.text }}
+          />
+          <Pressable onPress={addCustom} disabled={!custom.trim()} accessibilityLabel="Add perk" style={({ pressed }) => ({ height: 44, paddingHorizontal: spacing.md, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? colors.buttonFillPressed : colors.buttonFill, opacity: custom.trim() ? 1 : 0.5 })}>
+            <Text style={type.bodyStrong}>Add</Text>
+          </Pressable>
         </View>
       </View>
     </View>

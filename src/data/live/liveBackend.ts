@@ -4,14 +4,15 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { MEDIA_BUCKET, supabase } from '../../lib/supabase';
 import { Backend, SocialPlatform, Topic } from '../backend';
-import { FeedPost, JobAlert, Media, Review, Message, NewMedia, Offer, OfferWithPeople, PlaceResult, Profile, ThreadWithPeople } from '../types';
+import { ApplicationWithPeople, FeedPost, Job, JobAlert, Media, Review, Message, NewMedia, Offer, OfferWithPeople, PlaceResult, Profile, ThreadWithPeople } from '../types';
 
 // ---------- Row -> app type ----------
 
 const PROFILE = '*, social_accounts(*), google_listings(*)';
 const POST = `*, author:profiles!author_id(${PROFILE}), collab_business:profiles!collab_business_id(${PROFILE}), collab_creator:profiles!collab_creator_id(${PROFILE})`;
 const OFFER = `*, business:profiles!business_id(${PROFILE}), creator:profiles!creator_id(${PROFILE})`;
-const THREAD = `*, business:profiles!business_id(${PROFILE}), creator:profiles!creator_id(${PROFILE}), offer:offers!offer_id(*)`;
+const THREAD = `*, business:profiles!business_id(${PROFILE}), creator:profiles!creator_id(${PROFILE}), offer:offers!offer_id(*), applications(post_id, created_at, post:posts!post_id(caption))`;
+const APPLICATION = `*, creator:profiles!creator_id(${PROFILE}), post:posts!post_id(${POST})`;
 
 const one = <T,>(x: T | T[] | null | undefined): T | undefined => (Array.isArray(x) ? x[0] : (x ?? undefined));
 const ms = (iso: string) => new Date(iso).getTime();
@@ -69,8 +70,21 @@ function toPost(r: any): FeedPost {
     media: Array.isArray(r.media) && r.media.length ? (r.media as Media[]) : undefined,
     job:
       r.kind === 'job'
-        ? { serviceId: r.job_service, budget: r.job_budget, perks: r.job_perks ?? [], postBy: r.job_post_by ?? undefined }
+        ? {
+            serviceId: r.job_service,
+            quantity: r.job_quantity ?? 1,
+            description: r.job_description ?? undefined,
+            budget: r.job_budget,
+            perks: r.job_perks ?? [],
+            deadline: r.job_deadline ?? undefined,
+            timeframe: r.job_timeframe ?? undefined,
+            hires: r.job_hires ?? undefined,
+            postBy: r.job_post_by ?? undefined,
+          }
         : undefined,
+    applicationCount: r.kind === 'job' ? (r.application_count ?? 0) : undefined,
+    viewCount: r.kind === 'job' ? (r.view_count ?? 0) : undefined,
+    archived: r.kind === 'job' ? Boolean(r.archived) : undefined,
     author: toProfile(r.author),
     collabBusiness: r.collab_business ? toProfile(r.collab_business) : undefined,
     collabCreator: r.collab_creator ? toProfile(r.collab_creator) : undefined,
@@ -83,12 +97,14 @@ function toOffer(r: any): Offer {
     businessId: r.business_id,
     creatorId: r.creator_id,
     serviceId: r.service_id,
+    quantity: r.quantity ?? 1,
     price: r.price,
     perks: r.perks ?? [],
     postBy: r.post_by,
     status: r.status,
     lastProposedBy: r.last_proposed_by,
     threadId: r.thread_id,
+    postId: r.post_id ?? undefined,
     createdAt: ms(r.created_at),
     updatedAt: ms(r.updated_at),
   };
@@ -106,6 +122,22 @@ function toThread(r: any): ThreadWithPeople {
     business: toProfile(r.business),
     creator: toProfile(r.creator),
     offer: offer ? toOffer(offer) : undefined,
+    applications: (r.applications ?? []).map((a: any) => ({ postId: a.post_id, title: one<any>(a.post)?.caption ?? 'Job post', createdAt: ms(a.created_at) })),
+  };
+}
+
+// Job fields -> post columns (insert and update)
+function jobColumns(job: Job) {
+  return {
+    job_service: job.serviceId,
+    job_quantity: job.quantity,
+    job_description: job.description?.trim() || null,
+    job_budget: job.budget,
+    job_perks: job.perks,
+    job_deadline: job.deadline ?? null,
+    job_timeframe: job.timeframe ?? null,
+    job_hires: job.hires ?? null,
+    job_post_by: job.postBy ?? null,
   };
 }
 
@@ -118,6 +150,10 @@ function toMessage(r: any): Message {
     body: r.body,
     price: r.price ?? undefined,
     perks: r.perks ?? undefined,
+    serviceId: r.service_id ?? undefined,
+    quantity: r.quantity ?? undefined,
+    postBy: r.post_by ?? undefined,
+    postId: r.post_id ?? undefined,
     createdAt: ms(r.created_at),
   };
 }
@@ -145,7 +181,7 @@ function emit(...topics: Topic[]) {
 }
 
 function realtimeFor(topic: Topic, onChange: () => void) {
-  const table = topic.startsWith('messages:') ? 'messages' : topic === 'offers' ? 'offers' : topic === 'threads' ? 'threads' : topic === 'alerts' ? 'job_alerts' : null;
+  const table = topic.startsWith('messages:') ? 'messages' : topic === 'offers' ? 'offers' : topic === 'threads' ? 'threads' : topic === 'alerts' ? 'job_alerts' : topic === 'applications' ? 'applications' : null;
   if (!table) return () => {};
   const filter = topic.startsWith('messages:') ? `thread_id=eq.${topic.slice('messages:'.length)}` : undefined;
   const channel = supabase
@@ -176,8 +212,13 @@ export const liveBackend: Backend = {
   mode: 'live',
 
   async listFeed() {
-    const rows = check(await supabase.from('posts').select(POST).order('created_at', { ascending: false }).limit(200));
+    const rows = check(await supabase.from('posts').select(POST).eq('archived', false).order('created_at', { ascending: false }).limit(200));
     return rows.map(toPost);
+  },
+
+  async getPost(id) {
+    const row = check(await supabase.from('posts').select(POST).eq('id', id).maybeSingle());
+    return row ? toPost(row) : null;
   },
 
   async getProfile(id) {
@@ -209,7 +250,8 @@ export const liveBackend: Backend = {
 
   async listThreads(me) {
     const column = me.role === 'creator' ? 'creator_id' : 'business_id';
-    const rows = check(await supabase.from('threads').select(THREAD).eq(column, me.id).order('updated_at', { ascending: false }));
+    // A chat shows up once something has been sent in it
+    const rows = check(await supabase.from('threads').select(THREAD).eq(column, me.id).not('last_message', 'is', null).order('updated_at', { ascending: false }));
     return rows.map(toThread);
   },
 
@@ -234,6 +276,27 @@ export const liveBackend: Backend = {
       createdAt: ms(r.created_at),
       serviceId: one<any>(r.offer)?.service_id ?? undefined,
     }));
+  },
+
+  async listApplications(me) {
+    const column = me.role === 'creator' ? 'creator_id' : 'business_id';
+    const rows = check(await supabase.from('applications').select(APPLICATION).eq(column, me.id).order('created_at', { ascending: false }));
+    return rows.map((r: any): ApplicationWithPeople => ({
+      id: r.id,
+      postId: r.post_id,
+      creatorId: r.creator_id,
+      businessId: r.business_id,
+      threadId: r.thread_id,
+      createdAt: ms(r.created_at),
+      creator: toProfile(one(r.creator)),
+      post: toPost(one(r.post)),
+    }));
+  },
+
+  async findThread(me, otherId) {
+    const [b, c] = me.role === 'business' ? [me.id, otherId] : [otherId, me.id];
+    const row = check(await supabase.from('threads').select('id').eq('business_id', b).eq('creator_id', c).maybeSingle()) as any;
+    return row?.id ?? null;
   },
 
   async listMessages(threadId) {
@@ -267,7 +330,9 @@ export const liveBackend: Backend = {
     const row = check(
       await supabase.rpc('create_offer', {
         creator: input.creatorId,
+        post: input.postId ?? null,
         service: input.serviceId,
+        quantity: input.quantity,
         price: input.price,
         perks: input.perks,
         post_by: input.postBy,
@@ -278,9 +343,9 @@ export const liveBackend: Backend = {
     return toOffer(row);
   },
 
-  async openThread(_me, otherId) {
-    const id = check(await supabase.rpc('open_thread', { other: otherId })) as string;
-    emit('threads');
+  async startChat(_me, otherId, body) {
+    const id = check(await supabase.rpc('start_chat', { other: otherId, body })) as string;
+    emit('threads', `messages:${id}`);
     return id;
   },
 
@@ -289,13 +354,35 @@ export const liveBackend: Backend = {
     emit(`messages:${threadId}`, 'threads');
   },
 
-  async counterOffer(_me, offerId, price, perks, note) {
-    check(await supabase.rpc('counter_offer', { offer: offerId, new_price: price, new_perks: perks, note }));
+  async applyToPost(_me, postId, message) {
+    const id = check(await supabase.rpc('apply_to_post', { post: postId, message })) as string;
+    emit('applications', 'threads', 'feed', `messages:${id}`);
+    return id;
+  },
+
+  async reviseOffer(_me, offerId, terms, note) {
+    check(
+      await supabase.rpc('revise_offer', {
+        offer: offerId,
+        service: terms.serviceId,
+        quantity: terms.quantity,
+        price: terms.price,
+        perks: terms.perks,
+        post_by: terms.postBy,
+        note,
+      }),
+    );
     emit('offers', 'threads');
   },
 
   async respondToOffer(_me, offerId, answer) {
     check(await supabase.rpc('respond_offer', { offer: offerId, answer }));
+    emit('offers', 'threads');
+  },
+
+  // Needs migration 20261125000000_confirm_offer.sql
+  async confirmOffer(_me, offerId) {
+    check(await supabase.rpc('confirm_offer', { offer: offerId }));
     emit('offers', 'threads', 'profiles');
   },
 
@@ -310,10 +397,7 @@ export const liveBackend: Backend = {
           caption: input.caption,
           image_url: media.find((m) => m.type === 'image')?.uri ?? me.cover ?? null,
           media,
-          job_service: input.job.serviceId,
-          job_budget: input.job.budget,
-          job_perks: input.job.perks,
-          job_post_by: input.job.postBy ?? null,
+          ...jobColumns(input.job),
         }),
       );
     } else {
@@ -335,6 +419,29 @@ export const liveBackend: Backend = {
       );
     }
     emit('feed');
+  },
+
+  async updateJob(me, postId, input) {
+    const media: Media[] = [...input.keepMedia];
+    for (const m of input.newMedia.slice(0, Math.max(0, 10 - media.length))) media.push({ uri: await upload(me.id, m), type: m.type });
+    check(
+      await supabase
+        .from('posts')
+        .update({ caption: input.caption, media, image_url: media.find((m) => m.type === 'image')?.uri ?? me.cover ?? null, ...jobColumns(input.job) })
+        .eq('id', postId)
+        .eq('author_id', me.id),
+    );
+    emit('feed', 'applications');
+  },
+
+  async setArchived(me, postId, archived) {
+    check(await supabase.from('posts').update({ archived }).eq('id', postId).eq('author_id', me.id).eq('kind', 'job'));
+    emit('feed', 'applications');
+  },
+
+  // Needs migration 20261127000000_offer_terms_archive_views.sql
+  async recordView(_me, postId) {
+    await supabase.rpc('record_post_view', { post: postId }); // best effort: a missed view isn't worth an error
   },
 
   async likePost(postId) {

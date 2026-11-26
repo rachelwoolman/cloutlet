@@ -5,8 +5,18 @@
 // feed doesn't show the same person twice in a row. Every weight is below,
 // so you can tune the feed without touching the screens.
 //
-// score = freshness + nearby + engagement + collab + roleFit + verified + openToWork - seen
+// score = freshness + nearby + engagement + collab + roleFit + verified + openToWork
+//         - seen - shownLastTime + shuffle
 // All distances are in miles.
+//
+// Why the feed changes between app opens (it would otherwise be identical every time):
+//  - seen: posts you opened full screen go down. The push fades over a few days, so good
+//    posts come back later. Remembered on the device (feedHistory.ts).
+//  - shownLastTime: whatever sat at the top last time you opened the app goes down a little,
+//    so the top of the feed moves on.
+//  - shuffle: a small random nudge per post, fixed for the session (and new on pull-to-refresh).
+//    Enough to swap posts that score about the same, not enough to bury a fresh nearby job.
+//    Fixed per session so the order doesn't jump while you scroll.
 // ─────────────────────────────────────────────────────────────
 import { isVerified } from './catalog';
 import { FeedPost, LatLng, Role } from './types';
@@ -19,8 +29,12 @@ export const weights = {
   roleFit: 0.5, // creators see more jobs, businesses see more creator work
   verified: 0.2, // connected Instagram/TikTok or a verified Google listing
   openToWork: 0.6, // creator set "Open to work" ("Open to network" gets a third of this; "Not looking" gets none)
-  seen: 0.9, // already opened in full screen: push it down
+  seen: 0.9, // already opened in full screen: push it down (fades, see `seenHalfLifeHours`)
+  shownLastTime: 0.35, // was at the top of the feed last time you opened the app
+  shuffle: 0.3, // random nudge, 0 to this much, so similar posts trade places between visits
 };
+
+const seenHalfLifeHours = 36;
 
 const freshHalfLifeHours = 48;
 const nearbyHalfLifeMiles = 2;
@@ -32,7 +46,9 @@ const priorRate = 0.05;
 export type Viewer = {
   role: Role;
   location?: LatLng;
-  seenPostIds?: Set<string>;
+  openedAt?: Readonly<Record<string, number>>; // post id -> when you last opened it full screen (ms)
+  previousTop?: readonly string[]; // post ids at the top of the feed last time
+  shuffleSeed?: number; // changes per session / pull-to-refresh; same seed = same order
 };
 
 export function rankFeed(posts: FeedPost[], viewer: Viewer, now = Date.now()): FeedPost[] {
@@ -61,7 +77,10 @@ export function scorePost(post: FeedPost, viewer: Viewer, now = Date.now()): num
   const verified = isVerified(post.author) ? 1 : 0;
   const a = post.kind === 'video' && post.author.role === 'creator' ? (post.author.availability ?? 'open') : null;
   const openToWork = a === 'open' ? 1 : a === 'networking' ? 1 / 3 : 0;
-  const seen = viewer.seenPostIds?.has(post.id) ? 1 : 0;
+  const openedAtMs = viewer.openedAt?.[post.id];
+  const seen = openedAtMs ? Math.pow(0.5, Math.max(0, now - openedAtMs) / 3_600_000 / seenHalfLifeHours) : 0;
+  const shownLastTime = viewer.previousTop?.includes(post.id) ? 1 : 0;
+  const shuffle = viewer.shuffleSeed == null ? 0 : unitHash(`${viewer.shuffleSeed}:${post.id}`);
 
   return (
     weights.freshness * freshness +
@@ -71,8 +90,20 @@ export function scorePost(post: FeedPost, viewer: Viewer, now = Date.now()): num
     weights.roleFit * roleFit +
     weights.verified * verified +
     weights.openToWork * openToWork -
-    weights.seen * seen
+    weights.seen * seen -
+    weights.shownLastTime * shownLastTime +
+    weights.shuffle * shuffle
   );
+}
+
+// A number from 0 to 1 that's always the same for the same text (FNV-1a hash)
+function unitHash(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967296;
 }
 
 // Keep the best order, but never show the same author twice in a row,

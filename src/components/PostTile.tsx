@@ -2,12 +2,12 @@
 // shown over a photo of the business.
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { formatTerms, getService } from '../data/catalog';
 import { FeedPost } from '../data/types';
 import { colors, fonts, radius, spacing, type } from '../theme';
 import { Avatar } from './Avatar';
 import { Photo } from './Photo';
 import { Verified } from './Verified';
+import { deliverablesLabel, payLabel } from '../data/jobs';
 import { VideoPreview } from './VideoPreview';
 
 // Uneven heights make the two-column grid feel organic
@@ -83,10 +83,10 @@ function JobCover({ post, height }: { post: FeedPost; height: number }) {
           {post.caption}
         </Text>
         <Text style={{ fontFamily: fonts.body, fontSize: 12, color: colors.reelTextSecondary }} numberOfLines={1}>
-          {getService(job.serviceId).name}
+          {deliverablesLabel(job.serviceId, job.quantity ?? 1)}
         </Text>
         <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.reelText }} numberOfLines={1}>
-          {job.budget === null ? 'Open to offers' : formatTerms(job.budget, job.perks)}
+          {payLabel(job)}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
           <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.reelText }} numberOfLines={1}>

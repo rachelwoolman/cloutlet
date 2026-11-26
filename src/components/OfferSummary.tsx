@@ -1,7 +1,9 @@
 // An offer at a glance: who, how much, what, and whose move it is.
 import { ReactNode } from 'react';
 import { Text, View } from 'react-native';
-import { formatPerks, getService } from '../data/catalog';
+import { formatPerks } from '../data/catalog';
+import { offerStatus, offerStep, OfferStep, Tone } from '../data/deals';
+import { deliverablesLabel } from '../data/jobs';
 import { Offer, Profile, Role } from '../data/types';
 import { colors, fonts, radius, spacing, type } from '../theme';
 import { Avatar } from './Avatar';
@@ -9,11 +11,18 @@ import { Card } from './Card';
 import { Divider } from './TopBar';
 import { Verified } from './Verified';
 
-export function offerStatus(offer: Offer, myRole: Role): { label: string; tone: 'accent' | 'muted' | 'done' } {
-  if (offer.status === 'accepted') return { label: 'Deal', tone: 'done' };
-  if (offer.status === 'declined') return { label: 'Declined', tone: 'muted' };
-  return offer.lastProposedBy === myRole ? { label: 'Waiting', tone: 'muted' } : { label: 'Your move', tone: 'accent' };
-}
+export { isOpenOffer, needsMyMove, offerStatus, offerStep } from '../data/deals';
+export type { OfferStep } from '../data/deals';
+
+// What the terms on the card are, so it's clear when they're final
+const termsHeading: Record<OfferStep, string> = {
+  accept: 'Proposed terms',
+  waiting: 'Proposed terms',
+  confirm: 'Agreed terms · not confirmed yet',
+  confirming: 'Agreed terms · not confirmed yet',
+  deal: 'Confirmed deal',
+  declined: 'Declined terms',
+};
 
 type Props = {
   offer: Offer;
@@ -26,7 +35,6 @@ type Props = {
 
 export function OfferSummary({ offer, other, myRole, onPress, children, compact }: Props) {
   const status = offerStatus(offer, myRole);
-  const service = getService(offer.serviceId);
 
   return (
     <Card onPress={onPress} style={{ gap: compact ? spacing.sm : spacing.md, opacity: offer.status === 'declined' ? 0.6 : 1 }}>
@@ -40,13 +48,14 @@ export function OfferSummary({ offer, other, myRole, onPress, children, compact 
             <Verified profile={other} size={13} />
           </View>
           <Text style={[type.small, { fontSize: 12 }]} numberOfLines={1}>
-            {service.name} · {offer.postBy && offer.postBy !== 'Flexible' ? `by ${offer.postBy}` : 'Flexible date'}
+            {deliverablesLabel(offer.serviceId, offer.quantity ?? 1)} · {offer.postBy && offer.postBy !== 'Flexible' ? `by ${offer.postBy}` : 'Flexible date'}
           </Text>
         </View>
         <StatusPill {...status} />
       </View>
 
       <View>
+        <Text style={[type.small, { fontSize: 12 }]}>{termsHeading[offerStep(offer, myRole)]}</Text>
         <Text style={compact ? type.h2 : type.h1}>{offer.price > 0 ? `$${offer.price}` : 'Perks only'}</Text>
         {offer.perks.length ? <Text style={type.small}>+ {formatPerks(offer.perks)}</Text> : null}
       </View>
@@ -61,12 +70,20 @@ export function OfferSummary({ offer, other, myRole, onPress, children, compact 
   );
 }
 
-export function StatusPill({ label, tone }: { label: string; tone: 'accent' | 'muted' | 'done' }) {
-  const bg = tone === 'accent' ? colors.accent : tone === 'done' ? colors.accentSoft : colors.buttonFill;
-  const fg = tone === 'accent' ? colors.onAccent : tone === 'done' ? colors.accentPressed : colors.textSecondary;
+const pillLook: Record<Tone, { bg: string; fg: string; border?: string }> = {
+  action: { bg: colors.accent, fg: colors.onAccent },
+  applied: { bg: colors.appliedSoft, fg: colors.applied },
+  sent: { bg: 'transparent', fg: colors.accentPressed, border: colors.accent },
+  waiting: { bg: colors.buttonFill, fg: colors.textSecondary },
+  deal: { bg: colors.openSoft, fg: colors.open },
+  declined: { bg: 'transparent', fg: colors.textSecondary, border: colors.divider },
+};
+
+export function StatusPill({ label, tone }: { label: string; tone: Tone }) {
+  const look = pillLook[tone];
   return (
-    <View style={{ paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: bg }}>
-      <Text style={{ fontFamily: fonts.bodySemiBold, fontSize: 11, color: fg }}>{label}</Text>
+    <View style={{ paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: look.bg, borderWidth: look.border ? 1 : 0, borderColor: look.border }}>
+      <Text style={{ fontFamily: fonts.bodySemiBold, fontSize: 11, color: look.fg }}>{label}</Text>
     </View>
   );
 }

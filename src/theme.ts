@@ -27,6 +27,13 @@ export const colors = {
   google: '#1A73E8',
   openSoft: '#E6F4EE',
 
+  // Form problems ("Add a title"). Red, so it isn't confused with the orange accent
+  error: '#C62828',
+
+  // "Applied" status pill (blue, so it doesn't look like an offer)
+  applied: '#1A5FC9',
+  appliedSoft: '#E8F0FE',
+
   // Full-screen reels sit on black
   reelBackground: '#000000',
   reelText: '#FFFFFF',

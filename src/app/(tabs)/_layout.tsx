@@ -3,6 +3,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { ColorValue } from 'react-native';
+import { needsMyMove } from '../../components/OfferSummary';
 import { useAlerts, useOffers } from '../../data/hooks';
 import { useLocationSync } from '../../data/location';
 import { useSession } from '../../data/session';
@@ -31,7 +32,7 @@ function SignedInTabs({ me }: { me: Profile }) {
   const offers = useOffers(me);
   useLocationSync(me); // asks for location the first time, then keeps it fresh
   const alerts = useAlerts(me);
-  const yourMove = (offers.data ?? []).filter((o) => o.status === 'pending' && o.lastProposedBy !== me.role).length;
+  const yourMove = (offers.data ?? []).filter((o) => needsMyMove(o, me.role)).length;
   const unreadUpdates = (alerts.data ?? []).filter((a) => !a.read).length;
 
   return (

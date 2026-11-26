@@ -2,8 +2,10 @@
 // Two versions exist: demo (in memory, no setup) and live (Supabase).
 // Screens use the hooks in ./hooks.ts and never import either version directly.
 import {
+  ApplicationWithPeople,
   Availability,
   FeedPost,
+  JobUpdate,
   JobAlert,
   Review,
   LatLng,
@@ -11,6 +13,7 @@ import {
   NewOffer,
   NewPost,
   Offer,
+  OfferTerms,
   OfferWithPeople,
   PlaceResult,
   Profile,
@@ -20,7 +23,7 @@ import {
 } from './types';
 
 // Things screens can listen to. When one changes, screens showing it reload.
-export type Topic = 'feed' | 'profiles' | 'offers' | 'threads' | 'saved' | 'follows' | 'alerts' | `messages:${string}`;
+export type Topic = 'feed' | 'profiles' | 'offers' | 'threads' | 'applications' | 'saved' | 'follows' | 'alerts' | `messages:${string}`;
 
 export type SocialPlatform = 'instagram' | 'tiktok';
 
@@ -43,22 +46,40 @@ export interface Backend {
   // Reads
   listFeed(): Promise<FeedPost[]>;
   getProfile(id: string): Promise<Profile | null>;
-  listPostsFor(profileId: string): Promise<FeedPost[]>; // their own posts + collabs they're tagged in
+  getPost(id: string): Promise<FeedPost | null>;
+  listPostsFor(profileId: string): Promise<FeedPost[]>; // their own posts + collabs they're tagged in (archived jobs included)
   listBusinesses(): Promise<Profile[]>;
   listOffers(me: Profile): Promise<OfferWithPeople[]>;
   listThreads(me: Profile): Promise<ThreadWithPeople[]>;
   getThread(id: string): Promise<ThreadWithPeople | null>;
   listMessages(threadId: string): Promise<Message[]>;
   listReviews(profileId: string): Promise<Review[]>; // Cloutlet reviews about this profile, newest first
+  // Business: everyone who applied to its posts. Creator: their own applications.
+  listApplications(me: Profile): Promise<ApplicationWithPeople[]>;
+  // The existing chat with this person, or null. Never creates one.
+  findThread(me: Profile, otherId: string): Promise<string | null>;
 
   // Writes
   createProfile(userId: string, input: NewProfile): Promise<Profile>;
   createOffer(me: Profile, input: NewOffer): Promise<Offer>;
-  openThread(me: Profile, otherId: string): Promise<string>; // existing thread id, or a new one
+  // A chat only exists once someone sends something. startChat sends the first message
+  // (or adds to the existing chat) and returns the chat's id.
+  startChat(me: Profile, otherId: string, body: string): Promise<string>;
   sendMessage(me: Profile, threadId: string, body: string): Promise<void>;
-  counterOffer(me: Profile, offerId: string, price: number, perks: string[], note: string): Promise<void>;
-  respondToOffer(me: Profile, offerId: string, answer: 'accepted' | 'declined'): Promise<void>;
+  // Creator applies to a job post: sends the message and records the application, together.
+  // Returns the chat's id. Applying twice to the same post is refused.
+  applyToPost(me: Profile, postId: string, message: string): Promise<string>;
+  // Business changes the terms of its open offer (same offer, back to waiting on the creator)
+  reviseOffer(me: Profile, offerId: string, terms: OfferTerms, note: string): Promise<void>;
+  // The side that didn't propose the terms accepts them ('agreed'). Either side can decline while it's open.
+  respondToOffer(me: Profile, offerId: string, answer: 'agreed' | 'declined'): Promise<void>;
+  // The side that proposed the terms confirms after the other side accepted them. This makes it a deal.
+  confirmOffer(me: Profile, offerId: string): Promise<void>;
   createPost(me: Profile, input: NewPost): Promise<void>;
+  updateJob(me: Profile, postId: string, input: JobUpdate): Promise<void>; // your own job posts only
+  setArchived(me: Profile, postId: string, archived: boolean): Promise<void>; // your own job posts only
+  // Someone saw a job post in the full-screen viewer. Counted once per person per day; your own views don't count.
+  recordView(me: Profile, postId: string): Promise<void>;
   likePost(postId: string): Promise<void>;
   setLocation(me: Profile, location: LatLng | null): Promise<void>; // rounded to ~half a mile; null clears it
   updateProfile(me: Profile, patch: ProfilePatch): Promise<void>;

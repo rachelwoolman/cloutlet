@@ -3,9 +3,9 @@
 import { AudienceTier, Service, ServiceId } from './types';
 
 export const services: Service[] = [
-  { id: 'reel', name: 'Instagram Reel', description: 'Short vertical video on their feed' },
-  { id: 'maps', name: 'Google Maps video', description: 'Short video on your Google listing' },
-  { id: 'stories', name: 'Story set (3)', description: 'Three stories, live for 24h' },
+  { id: 'reel', name: 'Instagram Reel', plural: 'Instagram Reels', description: 'Short vertical video on their feed' },
+  { id: 'maps', name: 'Google Maps video', plural: 'Google Maps videos', description: 'Short video on your Google listing' },
+  { id: 'stories', name: 'Story set (3)', plural: 'Story sets (3 each)', description: 'Three stories, live for 24h' },
 ];
 
 export const audienceTiers: AudienceTier[] = [
@@ -22,6 +22,7 @@ export const tierPrices: Record<ServiceId, (number | null)[]> = {
   stories: [15, 25, 60, null],
 };
 
+// Suggestions. Businesses can also type their own perks.
 export const perkOptions = ['2 pastries', 'A drink', 'Lunch for two', 'Free brunch', 'A tote bag'];
 
 export const getService = (id: ServiceId) => services.find((s) => s.id === id)!;

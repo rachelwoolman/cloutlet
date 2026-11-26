@@ -2,11 +2,12 @@
 // Opens at the post you tapped, in the same order as Explore.
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, ListViewToken, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Loading, Reel } from '../components';
-import { backend, getLastFeed, markSeen, useFeed, useSavedIds } from '../data/hooks';
+import { backend, getLastFeed, markSeen, useApplications, useFeed, useSavedIds } from '../data/hooks';
+import { openChat, requestCollab } from '../lib/openChat';
 import { useMe } from '../data/session';
 import { FeedPost } from '../data/types';
 import { useMouseSwipe } from '../lib/useMouseSwipe';
@@ -31,21 +32,26 @@ export default function Reels() {
   const list = useRef<FlatList<FeedPost>>(null);
   useMouseSwipe(list, height, active, posts.length);
 
+  // FlatList needs this callback to never change, so it reads "me" through a ref
+  const meRef = useRef(me);
+  useEffect(() => {
+    meRef.current = me;
+  });
   const onViewable = useCallback(({ viewableItems }: { viewableItems: ListViewToken[] }) => {
     const first = viewableItems[0];
     if (first?.index != null) {
       setActive(first.index);
       markSeen((first.item as FeedPost).id);
+      backend.recordView(meRef.current, (first.item as FeedPost).id); // job posts: counted once per person per day
     }
   }, []);
 
-  const message = useCallback(
-    async (otherId: string, draft?: string) => {
-      const threadId = await backend.openThread(me, otherId);
-      router.push({ pathname: '/chat/[id]', params: { id: threadId, ...(draft ? { draft } : {}) } });
-    },
-    [me],
-  );
+  // Casual message (not an application). Opens the chat, or an empty one that's created on send.
+  const message = useCallback((otherId: string) => openChat(me, otherId, { via: 'feed' }), [me]);
+
+  // Job posts this creator already applied to -> the chat it's in
+  const applications = useApplications(me);
+  const appliedThread = new Map((me.role === 'creator' ? (applications.data ?? []) : []).map((a) => [a.postId, a.threadId]));
 
   // Anyone can save someone else's video to look at later. Creators can also save job posts.
   const saveProps = (item: FeedPost) => {
@@ -86,7 +92,11 @@ export default function Reels() {
               onOpenReviews={(id) => router.push(`/reviews/${id}`)}
               onOpenProfile={(id) => router.push(`/profile/${id}`)}
               onMessage={message}
-              onRequest={(id) => router.push(`/request/${id}`)}
+              onRequest={(id) => requestCollab(me, item.author)}
+              appliedThreadId={appliedThread.get(item.id)}
+              onApply={(postId) => router.push(`/apply/${postId}`)}
+              onOpenChat={(threadId) => router.push({ pathname: '/chat/[id]', params: { id: threadId, via: 'feed' } })}
+              onManage={(postId) => router.push(`/post/${postId}`)}
               onLike={(id) => backend.likePost(id)}
             />
           )}

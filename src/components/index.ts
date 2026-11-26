@@ -6,7 +6,7 @@ export { Chip } from './Chip';
 export { MapPins } from './MapPins';
 export type { MapPin } from './MapPins.types';
 export { MasonryFeed } from './MasonryFeed';
-export { OfferSummary, offerStatus, StatusPill } from './OfferSummary';
+export { isOpenOffer, needsMyMove, OfferSummary, offerStatus, offerStep, StatusPill } from './OfferSummary';
 export { Photo } from './Photo';
 export { PostTile, tileHeight } from './PostTile';
 export { Reel } from './Reel';

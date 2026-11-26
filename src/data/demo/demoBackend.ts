@@ -1,8 +1,7 @@
 // Demo backend: keeps everything in memory. Resets when the app reloads.
 // Lets you click through every feature before Supabase is set up.
 import { Backend, Topic } from '../backend';
-import { firstName } from '../catalog';
-import { FeedPost, Message, Offer, Post, Profile, Thread } from '../types';
+import { Application, FeedPost, Message, Offer, Post, Profile, Thread, ThreadWithPeople } from '../types';
 import * as seed from './seed';
 
 // Ratings come from the sample reviews, so the number matches what you can read
@@ -15,6 +14,10 @@ let posts = [...seed.posts];
 let offers = [...seed.offers];
 let threads = [...seed.threads];
 let messages = [...seed.messages];
+let applications: Application[] = [...seed.applications];
+// Job post views: "postId|viewerId|day". Starts empty: only views seen in this session are counted
+let views = new Set<string>();
+const viewCount = (postId: string) => [...views].filter((v) => v.startsWith(`${postId}|`)).length;
 let saved = new Map<string, string[]>(); // profile id -> saved post ids, newest first
 let follows = [...seed.follows]; // { creatorId, businessId }: bell turned on
 let alerts = [...seed.alerts]; // job updates sent to followers
@@ -34,18 +37,29 @@ function withPeople(post: Post): FeedPost {
     author: profile(post.authorId),
     collabBusiness: post.collabBusinessId ? profile(post.collabBusinessId) : undefined,
     collabCreator: post.collabCreatorId ? profile(post.collabCreatorId) : undefined,
+    applicationCount: post.kind === 'job' ? applications.filter((a) => a.postId === post.id).length : undefined,
+    viewCount: post.kind === 'job' ? viewCount(post.id) : undefined,
   };
 }
 
-function threadWithPeople(t: Thread) {
+function threadWithPeople(t: Thread): ThreadWithPeople {
   return {
     ...t,
     business: profile(t.businessId),
     creator: profile(t.creatorId),
     offer: offers.find((o) => o.id === t.offerId),
     lastMessage: [...messages].reverse().find((m) => m.threadId === t.id)?.body,
+    applications: applications
+      .filter((a) => a.threadId === t.id)
+      .map((a) => ({ postId: a.postId, title: posts.find((p) => p.id === a.postId)?.caption ?? 'Job post', createdAt: a.createdAt })),
   };
 }
+
+const sides = (me: Profile, otherId: string): [string, string] => {
+  const other = profile(otherId);
+  if (!other || other.role === me.role) throw new Error('Chats are between a creator and a business');
+  return me.role === 'business' ? [me.id, otherId] : [otherId, me.id];
+};
 
 function addMessage(m: Omit<Message, 'id' | 'createdAt'>) {
   const msg: Message = { ...m, id: id('msg'), createdAt: Date.now() };
@@ -58,6 +72,8 @@ function updateOffer(offerId: string, patch: Partial<Offer>) {
   offers = offers.map((o) => (o.id === offerId ? { ...o, ...patch, updatedAt: Date.now() } : o));
   emit('offers', 'threads');
 }
+
+const termsOf = (o: Offer) => ({ serviceId: o.serviceId, quantity: o.quantity, price: o.price, perks: o.perks, postBy: o.postBy });
 
 function findOrCreateThread(businessId: string, creatorId: string, offerId?: string): Thread {
   let t = threads.find((x) => x.businessId === businessId && x.creatorId === creatorId);
@@ -76,7 +92,12 @@ export const demoBackend: Backend = {
 
   async listFeed() {
     await wait();
-    return posts.map(withPeople);
+    return posts.filter((p) => !p.archived).map(withPeople);
+  },
+
+  async getPost(pid) {
+    const post = posts.find((p) => p.id === pid);
+    return post ? withPeople(post) : null;
   },
 
   async getProfile(pid) {
@@ -102,8 +123,10 @@ export const demoBackend: Backend = {
   },
 
   async listThreads(me) {
+    // A chat shows up once something has been sent in it
     return threads
       .filter((t) => (me.role === 'creator' ? t.creatorId : t.businessId) === me.id)
+      .filter((t) => messages.some((m) => m.threadId === t.id))
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .map(threadWithPeople);
   },
@@ -132,6 +155,10 @@ export const demoBackend: Backend = {
   },
 
   async createOffer(me, input) {
+    if (me.role !== 'business') throw new Error('Only businesses send offers');
+    if (offers.some((o) => o.businessId === me.id && o.creatorId === input.creatorId && (o.status === 'pending' || o.status === 'agreed'))) {
+      throw new Error('You already have an open offer with them. Update it instead.');
+    }
     const offerId = id('o');
     const thread = findOrCreateThread(me.id, input.creatorId, offerId);
     const offer: Offer = {
@@ -139,60 +166,97 @@ export const demoBackend: Backend = {
       businessId: me.id,
       creatorId: input.creatorId,
       serviceId: input.serviceId,
+      quantity: input.quantity,
       price: input.price,
       perks: input.perks,
       postBy: input.postBy,
       status: 'pending',
       lastProposedBy: 'business',
       threadId: thread.id,
+      postId: input.postId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
     offers = [offer, ...offers];
-    addMessage({ threadId: thread.id, senderId: me.id, kind: 'offer', body: input.message, price: input.price, perks: input.perks });
+    addMessage({ threadId: thread.id, senderId: me.id, kind: 'offer', body: input.message.trim(), ...termsOf(offer), postId: input.postId });
     emit('offers');
     return offer;
   },
 
-  async openThread(me, otherId) {
-    const other = profile(otherId);
-    const [businessId, creatorId] = me.role === 'business' ? [me.id, other.id] : [other.id, me.id];
+  async findThread(me, otherId) {
+    const [businessId, creatorId] = sides(me, otherId);
+    return threads.find((t) => t.businessId === businessId && t.creatorId === creatorId)?.id ?? null;
+  },
+
+  async startChat(me, otherId, body) {
+    const [businessId, creatorId] = sides(me, otherId);
     const t = findOrCreateThread(businessId, creatorId);
-    emit('threads');
+    addMessage({ threadId: t.id, senderId: me.id, kind: 'text', body });
     return t.id;
   },
 
   async sendMessage(me, threadId, body) {
     addMessage({ threadId, senderId: me.id, kind: 'text', body });
-    // Demo only: the other side writes back so the chat feels alive
-    const t = threads.find((x) => x.id === threadId)!;
-    const otherId = me.id === t.businessId ? t.creatorId : t.businessId;
-    setTimeout(() => {
-      addMessage({ threadId, senderId: otherId, kind: 'text', body: `Sounds good. — ${firstName(profile(otherId).name)}` });
-    }, 1200);
   },
 
-  async counterOffer(me, offerId, price, perks, note) {
-    const offer = offers.find((o) => o.id === offerId)!;
-    updateOffer(offerId, { price, perks, status: 'pending', lastProposedBy: me.role });
-    addMessage({ threadId: offer.threadId, senderId: me.id, kind: 'counter', body: note || 'New terms', price, perks });
+  // Same rules as apply_to_post in supabase/migrations
+  async applyToPost(me, postId, message) {
+    const post = posts.find((p) => p.id === postId);
+    if (me.role !== 'creator') throw new Error('Only creators apply to jobs');
+    if (!post || post.kind !== 'job') throw new Error('Job post not found');
+    if (post.archived) throw new Error('This job is closed');
+    if (applications.some((a) => a.postId === postId && a.creatorId === me.id)) throw new Error('You already applied to this post');
+    if (!message.trim()) throw new Error('Write a message to apply');
+    const t = findOrCreateThread(post.authorId, me.id);
+    addMessage({ threadId: t.id, senderId: me.id, kind: 'application', body: message.trim(), postId });
+    applications = [...applications, { id: id('ap'), postId, creatorId: me.id, businessId: post.authorId, threadId: t.id, createdAt: Date.now() }];
+    emit('applications', 'feed', 'threads');
+    return t.id;
   },
 
+  async reviseOffer(me, offerId, terms, note) {
+    const offer = offers.find((o) => o.id === offerId);
+    if (!offer || offer.businessId !== me.id) throw new Error('Not your offer');
+    if (offer.status !== 'pending' && offer.status !== 'agreed') throw new Error('This offer is closed. Send a new one.');
+    updateOffer(offerId, { ...terms, status: 'pending', lastProposedBy: 'business' });
+    addMessage({ threadId: offer.threadId, senderId: me.id, kind: 'counter', body: note.trim(), ...terms });
+  },
+
+  async listApplications(me) {
+    return applications
+      .filter((a) => (me.role === 'business' ? a.businessId : a.creatorId) === me.id)
+      .map((a) => ({ a, post: posts.find((p) => p.id === a.postId) }))
+      .filter((x): x is { a: Application; post: Post } => Boolean(x.post))
+      .sort((x, y) => y.a.createdAt - x.a.createdAt)
+      .map(({ a, post }) => ({ ...a, creator: profile(a.creatorId), post: withPeople(post) }));
+  },
+
+  // Same rules as respond_offer / confirm_offer in supabase/migrations
   async respondToOffer(me, offerId, answer) {
-    const offer = offers.find((o) => o.id === offerId)!;
+    const offer = offers.find((o) => o.id === offerId);
+    if (!offer || ![offer.businessId, offer.creatorId].includes(me.id)) throw new Error('Not your offer');
+    if (answer === 'agreed' && offer.status !== 'pending') throw new Error('This offer is not waiting on you');
+    if (answer === 'agreed' && offer.lastProposedBy === me.role) throw new Error('Waiting on the other side');
+    if (answer === 'declined' && offer.status !== 'pending' && offer.status !== 'agreed') throw new Error('This offer is closed');
     updateOffer(offerId, { status: answer });
     addMessage({
       threadId: offer.threadId,
       senderId: me.id,
       kind: answer,
-      body: answer === 'accepted' ? 'Deal' : 'Declined',
-      price: offer.price,
-      perks: offer.perks,
+      body: answer === 'agreed' ? 'Terms accepted' : 'Declined',
+      ...termsOf(offer),
     });
-    if (answer === 'accepted') {
-      profiles = profiles.map((p) => (p.id === offer.creatorId || p.id === offer.businessId ? { ...p, collabs: p.collabs + 1 } : p));
-      emit('profiles');
-    }
+  },
+
+  async confirmOffer(me, offerId) {
+    const offer = offers.find((o) => o.id === offerId);
+    if (!offer || ![offer.businessId, offer.creatorId].includes(me.id)) throw new Error('Not your offer');
+    if (offer.status !== 'agreed') throw new Error('The other side has not accepted these terms yet');
+    if (offer.lastProposedBy !== me.role) throw new Error('Only the side that made the offer confirms it');
+    updateOffer(offerId, { status: 'accepted' });
+    addMessage({ threadId: offer.threadId, senderId: me.id, kind: 'accepted', body: 'Deal', ...termsOf(offer) });
+    profiles = profiles.map((p) => (p.id === offer.creatorId || p.id === offer.businessId ? { ...p, collabs: p.collabs + 1 } : p));
+    emit('profiles');
   },
 
   async createPost(me, input) {
@@ -212,6 +276,31 @@ export const demoBackend: Backend = {
       alerts = [...fans.map((f) => ({ id: id('alert'), recipientId: f.creatorId, postId: post.id, createdAt: post.createdAt, read: false })), ...alerts];
       if (fans.length) emit('alerts');
     }
+    emit('feed');
+  },
+
+  async updateJob(me, postId, input) {
+    const post = posts.find((p) => p.id === postId);
+    if (!post || post.authorId !== me.id || post.kind !== 'job') throw new Error('You can only edit your own job posts');
+    const media = [...input.keepMedia, ...input.newMedia.map((m) => ({ uri: m.localUri, type: m.type }))].slice(0, 10);
+    const firstPhoto = media.find((m) => m.type === 'image')?.uri;
+    posts = posts.map((p) => (p.id === postId ? { ...p, caption: input.caption, job: input.job, media: media.length ? media : undefined, image: firstPhoto ?? me.cover ?? p.image } : p));
+    emit('feed', 'applications');
+  },
+
+  async setArchived(me, postId, archived) {
+    const post = posts.find((p) => p.id === postId);
+    if (!post || post.authorId !== me.id || post.kind !== 'job') throw new Error('You can only archive your own job posts');
+    posts = posts.map((p) => (p.id === postId ? { ...p, archived } : p));
+    emit('feed', 'applications');
+  },
+
+  async recordView(me, postId) {
+    const post = posts.find((p) => p.id === postId);
+    if (!post || post.kind !== 'job' || post.authorId === me.id) return;
+    const key = `${postId}|${me.id}|${new Date().toDateString()}`;
+    if (views.has(key)) return;
+    views = new Set(views).add(key);
     emit('feed');
   },
 

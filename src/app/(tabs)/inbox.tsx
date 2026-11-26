@@ -1,19 +1,25 @@
-// Inbox: offers (accept, or message to talk terms), message threads, and (creators) Updates:
-// "posted a new job" notices from businesses whose bell you turned on. Updates are a separate channel from messages.
+// Inbox.
+// Creators: Offers (from businesses; accept inside the chat), Messages, Updates ("posted a new job"
+//   notices from businesses whose bell you turned on, a separate channel from messages).
+// Businesses: Messages, one list with simple filters: All · Applicants · DMs.
+//   Applicants keeps the applicant rows (newest first) and can be narrowed by job post and follower size.
+//   Requested collabs: offers they made (creators don't make formal offers).
+// Newest first everywhere.
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Avatar, Button, Chip, Empty, ErrorNote, Loading, OfferSummary, offerStatus, StatusPill, Verified } from '../../components';
-import { getService, timeAgo } from '../../data/catalog';
-import { backend, setLastFeed, useAlerts, useOffers, useThreads } from '../../data/hooks';
+import { Avatar, Button, Chip, Empty, ErrorNote, Loading, needsMyMove, OfferSummary, StatusPill, Verified } from '../../components';
+import { conversationLabel } from '../../data/deals';
+import { formatFollowers, getService, timeAgo } from '../../data/catalog';
+import { backend, setLastFeed, useAlerts, useApplications, useOffers, useThreads } from '../../data/hooks';
 import { useMe } from '../../data/session';
 import { OfferWithPeople, Profile, ThreadWithPeople } from '../../data/types';
 import { colors, fonts, spacing, type } from '../../theme';
 
 export default function Inbox() {
   const me = useMe();
-  const [tab, setTab] = useState<'offers' | 'messages' | 'updates'>('offers');
+  const [tab, setTab] = useState<'offers' | 'messages' | 'updates'>(me.role === 'business' ? 'messages' : 'offers');
   const alerts = useAlerts(me);
   const unread = (alerts.data ?? []).filter((a) => !a.read).length;
 
@@ -22,8 +28,17 @@ export default function Inbox() {
       <View style={{ paddingHorizontal: spacing.screen, paddingTop: spacing.lg, gap: spacing.md }}>
         <Text style={{ fontFamily: fonts.heading, fontSize: 26, color: colors.text }}>Inbox</Text>
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <Chip label="Offers" selected={tab === 'offers'} onPress={() => setTab('offers')} />
-          <Chip label="Messages" selected={tab === 'messages'} onPress={() => setTab('messages')} />
+          {me.role === 'business' ? (
+            <>
+              <Chip label="Messages" selected={tab === 'messages'} onPress={() => setTab('messages')} />
+              <Chip label="Requested collabs" selected={tab === 'offers'} onPress={() => setTab('offers')} />
+            </>
+          ) : (
+            <>
+              <Chip label="Offers" selected={tab === 'offers'} onPress={() => setTab('offers')} />
+              <Chip label="Messages" selected={tab === 'messages'} onPress={() => setTab('messages')} />
+            </>
+          )}
           {me.role === 'creator' ? <Chip label={unread ? `Updates · ${unread}` : 'Updates'} selected={tab === 'updates'} onPress={() => setTab('updates')} /> : null}
         </View>
       </View>
@@ -42,8 +57,8 @@ function OffersList({ me }: { me: Profile }) {
       {offers.error ? <ErrorNote message={offers.error} /> : null}
       {offers.data && list.length === 0 ? (
         <Empty
-          title="No offers yet"
-          note={me.role === 'creator' ? 'Post your work so spots can find you.' : 'Find a creator in Explore.'}
+          title={me.role === 'business' ? 'No requested collabs yet' : 'No offers yet'}
+          note={me.role === 'creator' ? 'Post your work so spots can find you.' : 'Send one from a chat or a creator’s profile.'}
         />
       ) : null}
       {list.map((o) => (
@@ -53,31 +68,15 @@ function OffersList({ me }: { me: Profile }) {
   );
 }
 
+// Offers are only looked at here. Accepting and confirming happen inside the chat,
+// next to the conversation, so nobody agrees to a deal from a list.
 function OfferCard({ offer, me }: { offer: OfferWithPeople; me: Profile }) {
   const other = me.role === 'creator' ? offer.business : offer.creator;
-  const yourMove = offerStatus(offer, me.role).label === 'Your move';
-  const [busy, setBusy] = useState(false);
   const openChat = () => router.push(`/chat/${offer.threadId}`);
 
-  const accept = async () => {
-    setBusy(true);
-    try {
-      await backend.respondToOffer(me, offer.id, 'accepted');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
-    <OfferSummary offer={offer} other={other} myRole={me.role} onPress={() => openChat()}>
-      {yourMove ? (
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <Button title="Message" variant="secondary" size="sm" style={{ flex: 1 }} onPress={openChat} />
-          <Button title="Accept" size="sm" style={{ flex: 1 }} disabled={busy} onPress={accept} />
-        </View>
-      ) : (
-        <Button title="Open chat" variant="soft" size="sm" onPress={openChat} />
-      )}
+    <OfferSummary offer={offer} other={other} myRole={me.role} onPress={openChat}>
+      <Button title="Open chat" variant={needsMyMove(offer, me.role) ? 'primary' : 'soft'} size="sm" onPress={openChat} />
     </OfferSummary>
   );
 }
@@ -138,25 +137,117 @@ function UpdatesList({ me }: { me: Profile }) {
   );
 }
 
+// Business follower-size filter for applicants (same bands as the pricing tiers)
+const sizes = [
+  { label: 'Any size', min: 0, max: Infinity },
+  { label: 'Under 2K', min: 0, max: 1999 },
+  { label: '2K–10K', min: 2000, max: 9999 },
+  { label: '10K+', min: 10000, max: Infinity },
+];
+
+// One list of chats, newest first. Businesses filter it: All · Applicants · DMs
+// (DMs = no application: the creator just wrote, or the business reached out first).
 function ThreadsList({ me }: { me: Profile }) {
   const threads = useThreads(me);
-  const list = threads.data ?? [];
+  const [show, setShow] = useState<'all' | 'applicants' | 'casual'>('all');
+  const all = [...(threads.data ?? [])].sort((a, b) => b.updatedAt - a.updatedAt);
+  const list = show === 'casual' ? all.filter((t) => t.applications.length === 0) : all;
 
   return (
     <ScrollView contentContainerStyle={{ paddingVertical: spacing.md }}>
-      {threads.loading && !threads.data ? <Loading /> : null}
-      {threads.error ? <ErrorNote message={threads.error} /> : null}
-      {threads.data && list.length === 0 ? <Empty title="No messages yet" /> : null}
-      {list.map((t) => (
-        <ThreadRow key={t.id} thread={t} me={me} />
-      ))}
+      {me.role === 'business' ? (
+        <View style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.screen, paddingBottom: spacing.sm }}>
+          <Chip label="All" selected={show === 'all'} onPress={() => setShow('all')} />
+          <Chip label="Applicants" selected={show === 'applicants'} onPress={() => setShow('applicants')} />
+          <Chip label="DMs" selected={show === 'casual'} onPress={() => setShow('casual')} />
+        </View>
+      ) : null}
+      {show === 'applicants' ? (
+        <ApplicantsList me={me} threads={all} />
+      ) : (
+        <>
+          {threads.loading && !threads.data ? <Loading /> : null}
+          {threads.error ? <ErrorNote message={threads.error} /> : null}
+          {threads.data && all.length === 0 ? <Empty title="No messages yet" /> : null}
+          {threads.data && all.length > 0 && list.length === 0 ? <Empty title="No DMs" /> : null}
+          {list.map((t) => (
+            <ThreadRow key={t.id} thread={t} me={me} />
+          ))}
+        </>
+      )}
     </ScrollView>
+  );
+}
+
+// Business: who applied, newest first. Tap someone to open the chat.
+// Narrow by job post and follower size; both default to everything.
+function ApplicantsList({ me, threads }: { me: Profile; threads: ThreadWithPeople[] }) {
+  const applications = useApplications(me);
+  const [postId, setPostId] = useState<string>('all');
+  const [size, setSize] = useState(0);
+  const all = [...(applications.data ?? [])].sort((a, b) => b.createdAt - a.createdAt);
+  const posts = new Map(all.map((a) => [a.postId, a.post.caption]));
+  const band = sizes[size];
+  const list = all.filter((a) => (postId === 'all' || a.postId === postId) && (size === 0 || ((a.creator.followers ?? 0) >= band.min && (a.creator.followers ?? 0) <= band.max)));
+  const threadById = new Map(threads.map((t) => [t.id, t]));
+
+  return (
+    <View>
+      {all.length ? (
+        <View style={{ gap: spacing.sm, paddingBottom: spacing.sm }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingHorizontal: spacing.screen }}>
+            <Chip label="All jobs" selected={postId === 'all'} onPress={() => setPostId('all')} />
+            {[...posts].map(([id, title]) => (
+              <Chip key={id} label={title} selected={postId === id} onPress={() => setPostId(id)} />
+            ))}
+          </ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingHorizontal: spacing.screen }}>
+            {sizes.map((b, i) => (
+              <Chip key={b.label} label={b.label} selected={size === i} onPress={() => setSize(i)} />
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
+      {applications.loading && !applications.data ? <Loading /> : null}
+      {applications.error ? <ErrorNote message={applications.error} /> : null}
+      {applications.data && all.length === 0 ? <Empty title="No applicants yet" note="Creators who apply to your jobs show up here." /> : null}
+      {all.length > 0 && list.length === 0 ? <Empty title="No applicants match" /> : null}
+      {list.map((a) => {
+        const t = threadById.get(a.threadId);
+        const status = t ? conversationLabel(t, me.role) : null;
+        return (
+          <Pressable
+            key={a.id}
+            onPress={() => router.push(`/chat/${a.threadId}`)}
+            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.screen, paddingVertical: spacing.sm, backgroundColor: pressed ? colors.buttonFill : 'transparent' })}
+          >
+            <Avatar uri={a.creator.avatar} initials={a.creator.initials} size={44} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={[type.bodyStrong, { flexShrink: 1 }]} numberOfLines={1}>
+                  {a.creator.name}
+                </Text>
+                <Verified profile={a.creator} size={13} />
+                <Text style={[type.small, { fontSize: 12, marginLeft: 'auto' }]}>{timeAgo(a.createdAt)}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                <Text style={[type.small, { fontSize: 12, flex: 1 }]} numberOfLines={1}>
+                  {[a.creator.followers != null ? `${formatFollowers(a.creator.followers)} followers` : null, a.post.caption].filter(Boolean).join(' · ')}
+                </Text>
+                {status ? <StatusPill {...status} /> : null}
+              </View>
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
 function ThreadRow({ thread, me }: { thread: ThreadWithPeople; me: Profile }) {
   const other = me.role === 'creator' ? thread.business : thread.creator;
-  const status = thread.offer ? offerStatus(thread.offer, me.role) : null;
+  const status = conversationLabel(thread, me.role);
+  const applied = thread.applications.map((a) => a.title).join(', ');
   return (
     <Pressable
       onPress={() => router.push(`/chat/${thread.id}`)}
@@ -178,9 +269,14 @@ function ThreadRow({ thread, me }: { thread: ThreadWithPeople; me: Profile }) {
           <Verified profile={other} size={13} />
           <Text style={[type.small, { fontSize: 12, marginLeft: 'auto' }]}>{timeAgo(thread.updatedAt)}</Text>
         </View>
+        {applied ? (
+          <Text style={[type.small, { fontSize: 12, color: colors.accentPressed }]} numberOfLines={1}>
+            {me.role === 'creator' ? 'You applied' : 'Applied'}: {applied}
+          </Text>
+        ) : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <Text style={[type.small, { flex: 1 }]} numberOfLines={1}>
-            {thread.lastMessage ?? 'Say hi'}
+            {thread.lastMessage ?? ''}
           </Text>
           {status ? <StatusPill {...status} /> : null}
         </View>

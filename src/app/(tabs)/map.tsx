@@ -6,7 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar, Button, Empty, Loading, MapPin, MapPins, StatusPill, Verified } from '../../components';
 import { inBounds, MapBounds } from '../../components/MapPins.types';
 import { formatTerms, getService } from '../../data/catalog';
-import { backend, useBusinesses, useFeed } from '../../data/hooks';
+import { useBusinesses, useFeed } from '../../data/hooks';
+import { openChat } from '../../lib/openChat';
 import { distanceMiles, formatDistance } from '../../data/rank';
 import { useMe } from '../../data/session';
 import { Job, Profile } from '../../data/types';
@@ -71,7 +72,7 @@ export default function MapTab() {
             onOpen={() => router.push(`/profile/${b.id}`)}
             onMessage={
               me.role === 'creator'
-                ? async () => router.push(`/chat/${await backend.openThread(me, b.id)}`)
+                ? () => openChat(me, b.id, { via: 'feed' })
                 : undefined
             }
           />
@@ -118,7 +119,7 @@ function SpotRow({ business, distance, job, selected, onPress, onOpen, onMessage
             {business.google?.rating ? ` · ★ ${business.google.rating}` : ''}
           </Text>
         </View>
-        {job ? <StatusPill label="Hiring" tone="accent" /> : null}
+        {job ? <StatusPill label="Hiring" tone="action" /> : null}
       </View>
 
       {selected ? (

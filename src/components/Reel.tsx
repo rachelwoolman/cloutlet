@@ -1,13 +1,14 @@
 // One full-screen post in the vertical viewer (like Reels / TikTok).
 // Videos: like, message, profile on the right; caption and collab partner bottom-left.
 // Job posts: a swipeable slideshow of the business's photos, their Cloutlet rating,
-// and a bookmark so creators can save the job for later.
+// and a bookmark so creators can save the job for later. What's asked (how many, by when, pay)
+// is on the post; the full description opens in a sheet. Creators tap Apply.
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useRef, useState } from 'react';
-import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, ScrollViewInstance, StyleSheet, Text, View } from 'react-native';
-import { formatTerms, getService, timeAgo } from '../data/catalog';
-import { jobMessage } from '../data/pitch';
+import { Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, ScrollViewInstance, StyleSheet, Text, View } from 'react-native';
+import { timeAgo } from '../data/catalog';
+import { applicationCountLabel, deadlineLabel, deliverablesLabel, hiresLabel, jobSummary, payLabel } from '../data/jobs';
 import { FeedPost, Media, Profile } from '../data/types';
 import { colors, fonts, radius, spacing } from '../theme';
 import { Avatar } from './Avatar';
@@ -27,16 +28,21 @@ type Props = {
   canSave: boolean; // save this post (videos for anyone, job posts for creators)
   saved: boolean;
   onOpenProfile: (id: string) => void;
-  onMessage: (otherId: string, draft?: string) => void;
+  onMessage: (otherId: string) => void; // casual message, not an application
   onRequest: (creatorId: string) => void;
+  appliedThreadId?: string; // creator already applied to this job post: the chat it's in
+  onApply: (postId: string) => void; // opens the Apply screen; nothing is sent until they tap Send there
+  onOpenChat: (threadId: string) => void;
+  onManage: (postId: string) => void; // business, its own job post
   onLike: (postId: string) => void;
   onToggleSave: (saved: boolean) => void;
   onOpenReviews: (profileId: string) => void;
 };
 
-export function Reel({ post, me, active, width, height, topInset, bottomInset, canSave, saved, onOpenProfile, onMessage, onRequest, onLike, onToggleSave, onOpenReviews }: Props) {
+export function Reel({ post, me, active, width, height, topInset, bottomInset, canSave, saved, onOpenProfile, onMessage, onRequest, onLike, onToggleSave, onOpenReviews, appliedThreadId, onApply, onOpenChat, onManage }: Props) {
   const [liked, setLiked] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [details, setDetails] = useState(false); // job post: full description sheet
   const isMine = post.authorId === me.id;
   const isJob = post.kind === 'job';
 
@@ -44,13 +50,19 @@ export function Reel({ post, me, active, width, height, topInset, bottomInset, c
   const dealPartnerId = post.author.role !== me.role ? post.authorId : undefined;
 
   const cta =
-    isMine || !dealPartnerId
-      ? null
-      : isJob
-        ? { label: 'Message', onPress: () => onMessage(post.authorId, jobMessage(me, post)) }
-        : me.role === 'business'
-          ? { label: 'Request collab', onPress: () => onRequest(post.authorId) }
-          : null;
+    isMine && isJob
+      ? { label: 'Manage post', onPress: () => onManage(post.id) }
+      : isMine || !dealPartnerId || post.archived // a closed job takes no new applications
+        ? null
+        : isJob
+          ? appliedThreadId
+            ? { label: 'Applied · Open chat', onPress: () => onOpenChat(appliedThreadId) }
+            : { label: 'Apply', onPress: () => onApply(post.id) }
+          : me.role === 'business'
+            ? { label: 'Request collab', onPress: () => onRequest(post.authorId) }
+            : null;
+
+  const countLabel = isJob ? applicationCountLabel(post.applicationCount, isMine) : null;
 
   const above = (cta ? CTA_HEIGHT + bottomInset : bottomInset) + spacing.lg; // room for the bottom bar
 
@@ -110,13 +122,22 @@ export function Reel({ post, me, active, width, height, topInset, bottomInset, c
               <Text style={{ fontFamily: fonts.bodySemiBold, fontSize: 12, color: '#FFFFFF' }}>Hiring</Text>
             </View>
             <Text style={{ fontFamily: fonts.heading, fontSize: 28, lineHeight: 33, color: colors.reelText }}>{post.caption}</Text>
-            <Text style={styles.jobLine}>
-              {getService(post.job.serviceId).name}
-              {post.job.postBy ? ` · Post by ${post.job.postBy}` : ''}
-            </Text>
+            <Text style={styles.jobLine}>{jobSummary(post.job)}</Text>
             <Text style={[styles.jobLine, { fontFamily: fonts.bodySemiBold }]}>
-              {post.job.budget === null ? 'Open to offers' : formatTerms(post.job.budget, post.job.perks)}
+              {budgetLabel(post.job)}
+              {hiresLabel(post.job) ? <Text style={{ fontFamily: fonts.body }}> · {hiresLabel(post.job)}</Text> : null}
             </Text>
+            {countLabel ? <Text style={[styles.meta, { color: colors.reelText }]}>{countLabel}</Text> : null}
+            {/* Two lines of the description. "More" opens the whole post in a sheet, so reading it
+                never gets mixed up with swiping photos (sideways) or the next post (up). */}
+            {post.job.description ? (
+              <Pressable onPress={() => setDetails(true)} accessibilityRole="button" accessibilityLabel="Read the full job description" hitSlop={6}>
+                <Text style={styles.caption} numberOfLines={2}>
+                  {post.job.description}
+                </Text>
+                <Text style={[styles.caption, { fontFamily: fonts.bodySemiBold, marginTop: 2 }]}>More</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
 
@@ -150,7 +171,76 @@ export function Reel({ post, me, active, width, height, topInset, bottomInset, c
           <Text style={{ fontFamily: fonts.bodySemiBold, fontSize: 16, color: colors.onAccent }}>{cta.label}</Text>
         </Pressable>
       ) : null}
+
+      {isJob && post.job ? (
+        <JobDetailsSheet
+          visible={details}
+          post={post}
+          countLabel={countLabel}
+          bottomInset={bottomInset}
+          cta={cta}
+          onClose={() => setDetails(false)}
+        />
+      ) : null}
     </View>
+  );
+}
+
+const budgetLabel = payLabel; // always "per creator"
+
+// Everything about a job post, readable at your own pace. Slides up over the post; swipe or tap
+// outside to close. The same button as the post (Apply, Manage) is at the bottom.
+function JobDetailsSheet({ visible, post, countLabel, bottomInset, cta, onClose }: { visible: boolean; post: FeedPost; countLabel: string | null; bottomInset: number; cta: { label: string; onPress: () => void } | null; onClose: () => void }) {
+  const job = post.job!;
+  const rows: [string, string][] = [
+    ['What', deliverablesLabel(job.serviceId, job.quantity)],
+    ['Pay', budgetLabel(job)],
+    ...(deadlineLabel(job) ? [['Deadline', deadlineLabel(job)!] as [string, string]] : []),
+    ...(job.timeframe ? [['Takes about', job.timeframe] as [string, string]] : []),
+    ...(job.hires ? [['Hiring', `${job.hires} ${job.hires === 1 ? 'creator' : 'creators'}`] as [string, string]] : []),
+  ];
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={onClose} accessibilityLabel="Close details" />
+      <View style={{ maxHeight: '80%', backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, paddingBottom: bottomInset }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.screen, paddingBottom: spacing.sm, gap: spacing.md }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontFamily: fonts.heading, fontSize: 22, color: colors.text }}>{post.caption}</Text>
+            <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.textSecondary }}>{post.author.name}</Text>
+          </View>
+          <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Close">
+            <Ionicons name="close" size={24} color={colors.text} />
+          </Pressable>
+        </View>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.screen, paddingBottom: spacing.lg, gap: spacing.lg }}>
+          <View style={{ gap: spacing.sm }}>
+            {rows.map(([k, v]) => (
+              <View key={k} style={{ flexDirection: 'row', gap: spacing.md }}>
+                <Text style={{ width: 92, fontFamily: fonts.body, fontSize: 14, color: colors.textSecondary }}>{k}</Text>
+                <Text style={{ flex: 1, fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.text }}>{v}</Text>
+              </View>
+            ))}
+            {countLabel ? <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.textSecondary }}>{countLabel}</Text> : null}
+          </View>
+          {job.description ? <Text style={{ fontFamily: fonts.body, fontSize: 15, lineHeight: 22, color: colors.text }}>{job.description}</Text> : null}
+          <Text style={{ fontFamily: fonts.body, fontSize: 12, color: colors.textSecondary }}>Terms for each creator are worked out in chat.</Text>
+        </ScrollView>
+        {cta ? (
+          <View style={{ paddingHorizontal: spacing.screen, paddingVertical: spacing.md, borderTopWidth: 1, borderColor: colors.divider }}>
+            <Pressable
+              onPress={() => {
+                onClose();
+                cta.onPress();
+              }}
+              accessibilityRole="button"
+              style={({ pressed }) => ({ height: 48, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? colors.accentPressed : colors.accent })}
+            >
+              <Text style={{ fontFamily: fonts.bodySemiBold, fontSize: 16, color: colors.onAccent }}>{cta.label}</Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+    </Modal>
   );
 }
 

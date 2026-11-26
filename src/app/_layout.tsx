@@ -51,6 +51,8 @@ export default function RootLayout() {
         <Stack.Screen name="profile/[id]" />
         <Stack.Screen name="chat/[id]" />
         <Stack.Screen name="request/[id]" />
+        <Stack.Screen name="post/[id]" />
+        <Stack.Screen name="jobs/[id]" />
         <Stack.Screen name="verify" />
         <Stack.Screen name="saved" />
         <Stack.Screen name="settings" />
@@ -59,6 +61,8 @@ export default function RootLayout() {
         {/* Posting slides up as a sheet */}
         <Stack.Screen name="new-job" options={{ presentation: 'modal' }} />
         <Stack.Screen name="add-video" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="edit-job/[id]" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="apply/[postId]" options={{ presentation: 'modal' }} />
       </Stack.Protected>
     </Stack>
   );

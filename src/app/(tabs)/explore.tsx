@@ -20,7 +20,7 @@ type Filter = (typeof filters)[number] | 'Following';
 
 export default function Explore() {
   const me = useMe();
-  const feed = useFeed(me);
+  const feed = useFeed(me, { rememberTop: true });
   const following = useFollowingIds(me);
   const followingIds = new Set(following.data ?? []);
   const [query, setQuery] = useState('');
@@ -37,7 +37,7 @@ export default function Explore() {
       if (!me.location || !where || distanceMiles(me.location, where) > NEARBY_MILES) return false;
     }
     if (!q) return true;
-    return [p.caption, p.author.name, p.author.neighborhood, p.author.niche, p.author.kind, p.collabBusiness?.name]
+    return [p.caption, p.job?.description, p.author.name, p.author.neighborhood, p.author.niche, p.author.kind, p.collabBusiness?.name]
       .join(' ')
       .toLowerCase()
       .includes(q);

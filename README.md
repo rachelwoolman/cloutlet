@@ -17,7 +17,8 @@ npx expo start        # scan the QR code with Expo Go, or press w for web
 - **Collab tags**: videos booked through Cloutlet link both the creator and the business.
 - **Map**: local businesses on a map (Apple Maps on iPhone, Google Maps on Android, OpenStreetMap on web). Orange pins are hiring.
 - **Post**: creators upload portfolio videos. Businesses post jobs or videos.
-- **Inbox**: offers and messages. Either side can counter until someone accepts.
+- **Hiring posts**: businesses describe the work (format, how many, description, pay per creator, optional deadline, timeframe and number of creators) and edit it later from **Your posts** on their profile. Creators tap **Apply**, review a default message and send it; only a sent message counts as an application.
+- **Inbox**: deals are agreed in the chat in three steps: the business sends an offer, the creator accepts the terms, the business confirms. Businesses see Sent offers, Applicants (by post) and Messages (filter by post or Casual).
 - **Verification**: creators connect Instagram/TikTok. Businesses verify their Google listing.
 
 ## Where things live
@@ -28,6 +29,9 @@ npx expo start        # scan the QR code with Expo Go, or press w for web
 | Data types | `src/data/types.ts` |
 | Services, pricing tiers, perks | `src/data/catalog.ts` |
 | Feed algorithm | `src/data/rank.ts` |
+| Job posts (labels, checks, Apply message) | `src/data/jobs.ts` |
+| Deal and conversation labels | `src/data/deals.ts` |
+| Tests (`npm test`) | `src/data/__tests__/` |
 | Hooks screens use to read data | `src/data/hooks.ts` |
 | Login session | `src/data/session.ts` |
 | Demo backend + sample data | `src/data/demo/` |
